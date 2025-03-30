@@ -1,15 +1,9 @@
 "use client";
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { format } from 'date-fns'
-import { tr } from 'date-fns/locale'
-import { CalendarIcon, Plus, Trash2, ImagePlus, Clock } from 'lucide-react'
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
+import { CalendarIcon, Plus, Trash2, Clock } from 'lucide-react';
 
 interface EventFormData {
   title: string;
@@ -33,7 +27,8 @@ const AdminDashboard = () => {
     capacity: '',
     category: ''
   });
-  const [time, setTime] = useState<string>('')
+  const [time, setTime] = useState<string>('');
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -66,7 +61,7 @@ const AdminDashboard = () => {
     }));
   }
 
-  const handleDateSelect = (selectedDate: Date | undefined) => {
+  const handleDateSelect = (selectedDate: Date) => {
     if (selectedDate) {
       const currentDate = formData.date || new Date();
       selectedDate.setHours(currentDate.getHours());
@@ -75,11 +70,7 @@ const AdminDashboard = () => {
         ...prev,
         date: selectedDate
       }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        date: undefined
-      }));
+      setShowCalendar(false);
     }
   }
 
@@ -105,70 +96,91 @@ const AdminDashboard = () => {
 
   return (
     <div className="container mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">Yeni Etkinlik Ekle</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <form onSubmit={handleSubmit}>
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="p-6 border-b">
+          <h2 className="text-2xl font-bold">Yeni Etkinlik Ekle</h2>
+        </div>
+        <div className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Başlık */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Başlığı</label>
-              <Input
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Başlığı
+              </label>
+              <input
+                type="text"
                 name="title"
-                placeholder="Etkinlik başlığını giriniz"
                 value={formData.title}
                 onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               />
             </div>
 
             {/* Açıklama */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Açıklaması</label>
-              <Textarea
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Açıklaması
+              </label>
+              <textarea
                 name="description"
-                placeholder="Etkinlik açıklamasını giriniz"
-                className="min-h-[120px]"
                 value={formData.description}
                 onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[120px]"
                 required
               />
             </div>
 
             {/* Tarih ve Saat */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Tarihi ve Saati</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Tarihi ve Saati
+              </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="sm:col-span-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.date ? format(formData.date, 'PPP', { locale: tr }) : "Tarih seçiniz"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.date}
-                        onSelect={handleDateSelect}
-                        locale={tr}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="sm:col-span-2 relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCalendar(!showCalendar)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-left flex items-center"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.date ? format(formData.date, 'PPP', { locale: tr }) : "Tarih seçiniz"}
+                  </button>
+                  {showCalendar && (
+                    <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                      <div className="p-4">
+                        <div className="grid grid-cols-7 gap-1">
+                          {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((day) => (
+                            <div key={day} className="text-center text-sm font-medium text-gray-500">
+                              {day}
+                            </div>
+                          ))}
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => {
+                                const date = new Date();
+                                date.setDate(day);
+                                handleDateSelect(date);
+                              }}
+                              className="p-2 text-sm rounded-full hover:bg-gray-100"
+                            >
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="relative">
-                  <Input
+                  <input
                     type="time"
                     value={time}
                     onChange={handleTimeChange}
-                    className="w-full"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     step="300"
                     required
                   />
@@ -178,93 +190,103 @@ const AdminDashboard = () => {
             </div>
 
             {/* Lokasyon */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Lokasyonu</label>
-              <Input
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Lokasyonu
+              </label>
+              <input
+                type="text"
                 name="location"
-                placeholder="Etkinlik lokasyonunu giriniz"
                 value={formData.location}
                 onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               />
             </div>
 
             {/* Resim Linkleri */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Görselleri</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Görselleri
+              </label>
               <div className="space-y-3">
                 {formData.imageLinks.map((link, index) => (
                   <div key={index} className="flex gap-2">
-                    <Input
-                      placeholder="Görsel linkini giriniz"
+                    <input
+                      type="text"
                       value={link}
                       onChange={(e) => handleImageLinkChange(index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Görsel linkini giriniz"
                       required={index === 0}
                     />
                     {formData.imageLinks.length > 1 && (
-                      <Button
+                      <button
                         type="button"
-                        variant="destructive"
-                        size="icon"
                         onClick={() => removeImageLink(index)}
+                        className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </button>
                     )}
                   </div>
                 ))}
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  className="w-full"
                   onClick={addImageLink}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-center"
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Yeni Görsel Ekle
-                </Button>
+                </button>
               </div>
             </div>
 
             {/* Fiyat */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Fiyatı</label>
-              <Input
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Fiyatı
+              </label>
+              <input
                 type="number"
                 name="price"
-                placeholder="Fiyat giriniz"
                 value={formData.price}
                 onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
                 min="0"
               />
             </div>
 
             {/* Kapasite */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Kapasitesi</label>
-              <Input
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Kapasitesi
+              </label>
+              <input
                 type="number"
                 name="capacity"
-                placeholder="Kapasite giriniz"
                 value={formData.capacity}
                 onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
                 min="1"
               />
             </div>
 
             {/* Kategori Seçimi */}
-            <div className="space-y-2 mb-4">
-              <label className="text-sm font-medium">Etkinlik Kategorisi</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Etkinlik Kategorisi
+              </label>
               <select
                 name="category"
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
                 value={formData.category}
                 onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               >
                 <option value="">Kategori seçiniz</option>
-                {/* Kategoriler veritabanından gelecek */}
                 <option value="konser">Konser</option>
                 <option value="tiyatro">Tiyatro</option>
                 <option value="festival">Festival</option>
@@ -274,14 +296,17 @@ const AdminDashboard = () => {
             </div>
 
             {/* Kaydet Butonu */}
-            <Button type="submit" className="w-full">
+            <button
+              type="submit"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
               Etkinlik Oluştur
-            </Button>
+            </button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default AdminDashboard
+export default AdminDashboard;
