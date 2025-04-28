@@ -1,55 +1,173 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
+import axios from "axios";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "react-hot-toast";
+
+interface Category {
+  id: number;
+  attributes: {
+    isim: string;
+    aciklama: string;
+    slug: string;
+  };
+}
 
 export function EventFilters() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category === selectedCategory ? null : category);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // URL parametrelerinden filtreleri al
+  const selectedCategoryParam = searchParams.get('category');
+  const selectedDateParam = searchParams.get('date');
+  const minPriceParam = searchParams.get('minPrice');
+  const maxPriceParam = searchParams.get('maxPrice');
+  const selectedLocationParam = searchParams.get('location');
+
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(selectedCategoryParam);
+  const [selectedDate, setSelectedDate] = useState<string | null>(selectedDateParam);
+  const [minPrice, setMinPrice] = useState<string>(minPriceParam || '');
+  const [maxPrice, setMaxPrice] = useState<string>(maxPriceParam || '');
+  const [selectedLocation, setSelectedLocation] = useState<string>(selectedLocationParam || '');
+
+  // Kategorileri Strapi'den getir
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get('http://localhost:1337/api/categories');
+        if (response.data && response.data.data) {
+          setCategories(response.data.data);
+        }
+      } catch (error) {
+        console.error("Kategoriler yüklenirken hata:", error);
+        toast.error("Kategoriler yüklenemedi");
+      }
+    };
+
+    // Benzersiz konumları getir
+    const fetchLocations = async () => {
+      try {
+        const response = await axios.get('http://localhost:1337/api/events');
+        if (response.data && response.data.data) {
+          // Benzersiz konumları çıkart
+        
+            const uniqueLocations = [...new Set(
+            response.data.data
+              .map((event: any) => event.attributes.lokasyon)
+              .filter(Boolean)
+            )] as string[];
+            setLocations(uniqueLocations);
+        }
+      } catch (error) {
+        console.error("Konumlar yüklenirken hata:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCategories();
+    fetchLocations();
+  }, []);
+
+  // Filtre değiştiğinde URL güncelle ve etkinlikleri filtrele
+  const updateFilters = () => {
+    const params = new URLSearchParams();
+
+    if (selectedCategory) params.set('category', selectedCategory);
+    if (selectedDate) params.set('date', selectedDate);
+    if (minPrice) params.set('minPrice', minPrice);
+    if (maxPrice) params.set('maxPrice', maxPrice);
+    if (selectedLocation) params.set('location', selectedLocation);
+
+    router.push(`/events?${params.toString()}`);
+  };
+
+  const handleCategoryChange = (categoryId: string) => {
+    const newCategory = categoryId === selectedCategory ? null : categoryId;
+    setSelectedCategory(newCategory);
+    setTimeout(updateFilters, 0);
   };
 
   const handleDateChange = (date: string) => {
-    setSelectedDate(date === selectedDate ? null : date);
+    const newDate = date === selectedDate ? null : date;
+    setSelectedDate(newDate);
+    setTimeout(updateFilters, 0);
+  };
+
+  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLocation(e.target.value);
+    setTimeout(updateFilters, 0);
+  };
+
+  const handlePriceChange = (min: string, max: string) => {
+    setMinPrice(min);
+    setMaxPrice(max);
+  };
+
+  const applyPriceFilter = () => {
+    updateFilters();
   };
 
   const clearFilters = () => {
     setSelectedCategory(null);
     setSelectedDate(null);
+    setMinPrice('');
+    setMaxPrice('');
+    setSelectedLocation('');
+    router.push('/events');
   };
-  const categories = [
-    { label: "Tüm Kategoriler", value: "all" },
-    { label: "Konserler", value: "concert" },
-    { label: "Spor", value: "sports" },
-    { label: "Tiyatro", value: "theater" },
-    { label: "Festivaller", value: "festival" },
-  ];
-  
+
   const dates = [
     { label: "Bugün", value: "today" },
     { label: "Bu Hafta", value: "this-week" },
     { label: "Bu Ay", value: "this-month" },
     { label: "Gelecek Ay", value: "next-month" },
-  ]; 
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-4 border border-border rounded-md bg-card animate-pulse">
+        <div className="h-6 bg-muted rounded-md w-1/2 mb-4"></div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-10 bg-muted rounded-md"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 border border-border rounded-md bg-card">
       <div>
         <h3 className="text-lg font-medium text-foreground mb-4">Kategoriler</h3>
         <div className="space-y-2">
+          <button
+            onClick={() => handleCategoryChange("")}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${!selectedCategory
+              ? "bg-primary text-primary-foreground"
+              : "text-foreground hover:bg-accent"
+              }`}
+          >
+            Tüm Kategoriler
+          </button>
           {categories.map((category) => (
             <button
-              key={category.value}
-              onClick={() => handleCategoryChange(category.value)}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedCategory === category.value
+              key={category.id}
+              onClick={() => handleCategoryChange(String(category.id))}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedCategory === String(category.id)
                 ? "bg-primary text-primary-foreground"
                 : "text-foreground hover:bg-accent"
                 }`}
             >
-              {category.label}
+              {category.attributes.isim}
             </button>
           ))}
         </div>
@@ -86,6 +204,8 @@ export function EventFilters() {
                 type="number"
                 name="min"
                 id="min"
+                value={minPrice}
+                onChange={(e) => handlePriceChange(e.target.value, maxPrice)}
                 className="block w-full pl-7 pr-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
                 placeholder="Min"
               />
@@ -99,11 +219,21 @@ export function EventFilters() {
                 type="number"
                 name="max"
                 id="max"
+                value={maxPrice}
+                onChange={(e) => handlePriceChange(minPrice, e.target.value)}
                 className="block w-full pl-7 pr-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
                 placeholder="Max"
               />
             </div>
           </div>
+          <Button
+            onClick={applyPriceFilter}
+            variant="secondary"
+            className="w-full mt-3"
+            disabled={!minPrice && !maxPrice}
+          >
+            Fiyat Filtrele
+          </Button>
         </div>
       </div>
 
@@ -113,13 +243,16 @@ export function EventFilters() {
           <select
             id="location"
             name="location"
+            value={selectedLocation}
+            onChange={handleLocationChange}
             className="block w-full py-2 px-3 border border-border bg-background rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-foreground"
           >
             <option value="">Tüm Konumlar</option>
-            <option value="istanbul">İstanbul</option>
-            <option value="ankara">Ankara</option>
-            <option value="izmir">İzmir</option>
-            <option value="antalya">Antalya</option>
+            {locations.map((location, index) => (
+              <option key={index} value={location}>
+                {location}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -129,7 +262,7 @@ export function EventFilters() {
           onClick={clearFilters}
           variant="outline"
           className="w-full"
-          disabled={!selectedCategory && !selectedDate}
+          disabled={!selectedCategory && !selectedDate && !minPrice && !maxPrice && !selectedLocation}
         >
           Filtreleri Temizle
         </Button>

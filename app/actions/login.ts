@@ -12,16 +12,11 @@ const login = async (email: string, password: string) => {
 
     // Kullanıcı bilgilerini ve JWT'yi store'a kaydet
     const { setJwt, setUser, setIsAuthenticated } = useAuthStore.getState();
-
-    // JWT'yi hem store'da hem de localStorage'da sakla
     setJwt(response.data.jwt);
 
     // Kullanıcı verilerini formatlayarak store'a kaydet
     setUser(response.data.user);
-
-    // Kimlik doğrulama durumunu güncelle
     setIsAuthenticated(true);
-
     console.log("Kullanıcı verileri:", response.data.user);
 
     return response.data;
