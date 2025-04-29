@@ -7,13 +7,11 @@ import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
+// MongoDB Category tipi
 interface Category {
-  id: number;
-  attributes: {
-    isim: string;
-    aciklama: string;
-    slug: string;
-  };
+  _id: string;
+  name: string;
+  description: string;
 }
 
 export function EventFilters() {
@@ -37,11 +35,11 @@ export function EventFilters() {
   const [maxPrice, setMaxPrice] = useState<string>(maxPriceParam || '');
   const [selectedLocation, setSelectedLocation] = useState<string>(selectedLocationParam || '');
 
-  // Kategorileri Strapi'den getir
+  // Kategorileri MongoDB API'den getir
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get('http://localhost:1337/api/categories');
+        const response = await axios.get('http://localhost:5000/api/categories');
         if (response.data && response.data.data) {
           setCategories(response.data.data);
         }
@@ -54,16 +52,15 @@ export function EventFilters() {
     // Benzersiz konumları getir
     const fetchLocations = async () => {
       try {
-        const response = await axios.get('http://localhost:1337/api/events');
+        const response = await axios.get('http://localhost:5000/api/events');
         if (response.data && response.data.data) {
           // Benzersiz konumları çıkart
-        
-            const uniqueLocations = [...new Set(
+          const uniqueLocations = [...new Set(
             response.data.data
-              .map((event: any) => event.attributes.lokasyon)
+              .map((event: any) => event.location)
               .filter(Boolean)
-            )] as string[];
-            setLocations(uniqueLocations);
+          )] as string[];
+          setLocations(uniqueLocations);
         }
       } catch (error) {
         console.error("Konumlar yüklenirken hata:", error);
@@ -160,14 +157,14 @@ export function EventFilters() {
           </button>
           {categories.map((category) => (
             <button
-              key={category.id}
-              onClick={() => handleCategoryChange(String(category.id))}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedCategory === String(category.id)
+              key={category._id}
+              onClick={() => handleCategoryChange(String(category._id))}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedCategory === String(category._id)
                 ? "bg-primary text-primary-foreground"
                 : "text-foreground hover:bg-accent"
                 }`}
             >
-              {category.attributes.isim}
+              {category.name}
             </button>
           ))}
         </div>

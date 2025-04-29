@@ -25,7 +25,7 @@ export default function OrganizerApplicationPage() {
 
   // Zaten organizatör ise ana sayfaya yönlendir
   useEffect(() => {
-    if (user?.rol === "organizer") {
+    if (user?.role === "organizer") {
       toast.error("Zaten organizatör rolüne sahipsiniz.");
       router.push("/");
     }
@@ -33,18 +33,44 @@ export default function OrganizerApplicationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!title || !description) {
       toast.error("Lütfen tüm alanları doldurun.");
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
+      // JWT token al
+      const token = useAuthStore.getState().getJwt();
+
+      if (!token) {
+        throw new Error("Oturum bilgilerinize ulaşılamadı, lütfen tekrar giriş yapın.");
+      }
+
+      // API isteği gönder
+      const response = await fetch("http://localhost:5000/api/organizer-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ title, description })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Başvuru gönderilirken bir hata oluştu.");
+      }
+
+      console.log("Organizatör başvurusu başarıyla gönderildi:", data);
+
       toast.success("Başvurunuz başarıyla gönderildi. İncelendikten sonra size bilgi verilecektir.");
       router.push("/");
     } catch (error: any) {
+      console.error("Başvuru hatası:", error);
       toast.error(error.message || "Başvuru gönderilirken bir hata oluştu.");
     } finally {
       setIsSubmitting(false);
@@ -57,7 +83,7 @@ export default function OrganizerApplicationPage() {
       <p className="mb-6 text-muted-foreground">
         Organizatör olmak için lütfen aşağıdaki formu doldurun. Başvurunuz incelendikten sonra size bilgi verilecektir.
       </p>
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium mb-2">Başvuru Başlığı</label>
@@ -68,7 +94,7 @@ export default function OrganizerApplicationPage() {
             required
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium mb-2">Başvuru Açıklaması</label>
           <Textarea
@@ -79,7 +105,7 @@ export default function OrganizerApplicationPage() {
             required
           />
         </div>
-        
+
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? "Gönderiliyor..." : "Başvuruyu Gönder"}
         </Button>

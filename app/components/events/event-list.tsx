@@ -8,30 +8,20 @@ import axios from "axios";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
+// MongoDB Event tipini tanımlıyoruz
 interface Event {
-  id: string;
-  attributes: {
-    baslik: string;
-    aciklama: string;
-    lokasyon: string;
-    tarih: string;
-    fiyat: number;
-    kapakFoto: {
-      data: {
-        attributes: {
-          url: string;
-        };
-      };
-    } | null;
-    kategori: {
-      data: {
-        id: number;
-        attributes: {
-          isim: string;
-        };
-      };
-    } | null;
+  _id: string;
+  title: string;
+  description: string;
+  location: string;
+  date: string;
+  price: number;
+  image: string;
+  category: {
+    _id: string;
+    name: string;
   };
+  organizerId: string;
 }
 
 export function EventList() {
@@ -51,85 +41,30 @@ export function EventList() {
       try {
         setIsLoading(true);
 
-        // Strapi filtre parametrelerini oluştur
-        let filters: any = {};
+        // MongoDB API için sorgu parametreleri oluştur
+        let queryParams: any = {};
 
         // Kategori filtresi
         if (categoryId) {
-          filters['kategori'] = {
-            id: {
-              $eq: categoryId
-            }
-          };
+          queryParams.category = categoryId;
         }
 
         // Fiyat filtresi
-        if (minPrice || maxPrice) {
-          filters['fiyat'] = {};
-          if (minPrice) filters['fiyat']['$gte'] = Number(minPrice);
-          if (maxPrice) filters['fiyat']['$lte'] = Number(maxPrice);
-        }
+        if (minPrice) queryParams.minPrice = Number(minPrice);
+        if (maxPrice) queryParams.maxPrice = Number(maxPrice);
 
-        // Konum filtresi
+        // Konum filtresi - MongoDB API'niz location araması destekliyorsa
         if (location) {
-          filters['lokasyon'] = {
-            $containsi: location
-          };
+          queryParams.location = location;
         }
 
         // Tarih filtresi
         if (dateFilter) {
-          const today = new Date();
-          const todayStr = today.toISOString().split('T')[0];
-
-          switch (dateFilter) {
-            case 'today':
-              filters['tarih'] = {
-                $eq: todayStr
-              };
-              break;
-            case 'this-week': {
-              const endOfWeek = new Date(today);
-              endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
-              filters['tarih'] = {
-                $gte: todayStr,
-                $lte: endOfWeek.toISOString().split('T')[0]
-              };
-              break;
-            }
-            case 'this-month': {
-              const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-              filters['tarih'] = {
-                $gte: todayStr,
-                $lte: endOfMonth.toISOString().split('T')[0]
-              };
-              break;
-            }
-            case 'next-month': {
-              const firstOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-              const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-              filters['tarih'] = {
-                $gte: firstOfNextMonth.toISOString().split('T')[0],
-                $lte: endOfNextMonth.toISOString().split('T')[0]
-              };
-              break;
-            }
-          }
+          queryParams.dateFilter = dateFilter;
         }
 
-        // Sorgu parametresini oluştur
-        const queryParams = {
-          populate: 'kapakFoto,kategori',
-          filters: Object.keys(filters).length > 0 ? filters : undefined
-        };
-
-        // Strapi'ye sorgu yap
-        const response = await axios.get('http://localhost:1337/api/events', {
-          params: {
-            populate: queryParams.populate,
-            filters: queryParams.filters ? JSON.stringify(queryParams.filters) : undefined
-          }
-        });
+        // MongoDB API'ye sorgu yap
+        const response = await axios.get('http://localhost:5000/api/events', { params: queryParams });
 
         if (response.data && response.data.data) {
           setEvents(response.data.data);
@@ -190,50 +125,43 @@ export function EventList() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {events.map((event) => (
           <div
-            key={event.id}
+            key={event._id}
             className="flex flex-col rounded-lg overflow-hidden border border-border bg-card transition-all duration-200 hover:border-primary hover:shadow-md"
           >
             <div className="relative h-48 bg-muted">
               <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{
-                  backgroundImage: `url(${event.attributes.kapakFoto?.data?.attributes?.url
-                      ? `http://localhost:1337${event.attributes.kapakFoto.data.attributes.url}`
-                      : defaultImageUrl
-                    })`
+                  backgroundImage: `url(${event.image || defaultImageUrl})`
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-0 left-0 p-4">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground">
-                  {event.attributes.kategori?.data?.attributes?.isim || "Genel"}
+                  {event.category?.name || "Genel"}
                 </span>
               </div>
             </div>
             <div className="flex-1 p-6 flex flex-col">
-              <h3 className="text-lg font-medium text-foreground">{event.attributes.baslik}</h3>
+              <h3 className="text-lg font-medium text-foreground">{event.title}</h3>
               <div className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                {event.attributes.aciklama}
+                {event.description}
               </div>
               <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <Calendar className="mr-2 h-4 w-4" />
-                  {formatDate(event.attributes.tarih)}
+                  {formatDate(event.date)}
                 </div>
-                {/* <div className="flex items-center">
-                  <Clock className="mr-2 h-4 w-4" />
-                  {event.time}
-                </div> */}
                 <div className="flex items-center">
                   <MapPin className="mr-2 h-4 w-4" />
-                  {event.attributes.lokasyon}
+                  {event.location}
                 </div>
               </div>
               <div className="mt-6 flex items-center justify-between">
                 <div className="text-lg font-semibold text-foreground">
-                  {event.attributes.fiyat} ₺
+                  {event.price} ₺
                 </div>
-                <Link href={`/events/${event.id}`}>
+                <Link href={`/events/${event._id}`}>
                   <Button size="sm">Bilet Al</Button>
                 </Link>
               </div>

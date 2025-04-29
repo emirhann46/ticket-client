@@ -4,8 +4,8 @@ import useAuthStore from "@/app/hooks/useAuth";
 interface ProfileUpdateData {
   username?: string;
   email?: string;
-  phone?: string;
-  address?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export const updateProfile = async (data: ProfileUpdateData) => {
@@ -13,7 +13,7 @@ export const updateProfile = async (data: ProfileUpdateData) => {
     const { jwt } = useAuthStore.getState();
 
     const response = await axios.put(
-      "http://localhost:1337/api/users/me?populate=*",
+      "http://localhost:5000/api/users/profile",
       data,
       {
         headers: {
@@ -34,12 +34,11 @@ export const changePassword = async (currentPassword: string, newPassword: strin
   try {
     const { jwt } = useAuthStore.getState();
 
-    const response = await axios.post(
-      "http://localhost:1337/api/auth/change-password",
+    const response = await axios.put(
+      "http://localhost:5000/api/auth/update-password",
       {
         currentPassword,
-        password: newPassword,
-        passwordConfirmation: newPassword,
+        newPassword,
       },
       {
         headers: {
@@ -56,16 +55,18 @@ export const changePassword = async (currentPassword: string, newPassword: strin
   }
 };
 
+// Dosya yükleme işlemi için daha sonra implement edilecek
+// MongoDB API'de henüz profil resmi yükleme endpoint'i oluşturulmadı
+/* 
 export const uploadProfileImage = async (file: File) => {
   try {
     const { jwt } = useAuthStore.getState();
 
     const formData = new FormData();
-    formData.append('files', file);
+    formData.append('file', file);
 
-    // Önce dosyayı yükle
-    const uploadResponse = await axios.post(
-      "http://localhost:1337/api/upload",
+    const response = await axios.post(
+      "http://localhost:5000/api/users/upload-avatar",
       formData,
       {
         headers: {
@@ -75,26 +76,11 @@ export const uploadProfileImage = async (file: File) => {
       }
     );
 
-    // Yüklenen dosyanın ID'sini al
-    const fileId = uploadResponse.data[0].id;
-
-    // Kullanıcı profilini güncelle
-    const updateResponse = await axios.put(
-      "http://localhost:1337/api/users/me",
-      {
-        profileImage: fileId
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-        },
-      }
-    );
-
-    console.log("Profil resmi güncelleme başarılı:", updateResponse.data);
-    return updateResponse.data;
+    console.log("Profil resmi güncelleme başarılı:", response.data);
+    return response.data;
   } catch (error) {
     console.error("Profil resmi güncelleme hatası:", error);
     throw error;
   }
-}; 
+};
+*/

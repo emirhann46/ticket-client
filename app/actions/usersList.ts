@@ -16,20 +16,20 @@ export async function getUsersList() {
       throw new Error("Yetkilendirme hatası! Giriş yapmalısın.");
     }
 
-    // Kullanıcı listesini al
-    const response = await axios.get("http://localhost:1337/api/users", {
+    // MongoDB API'den kullanıcı listesini al
+    const response = await axios.get("http://localhost:5000/api/users", {
       headers: {
         Authorization: `Bearer ${token}`
       }
     });
 
-    // Kullanıcı verilerini işle ve rol bilgisini düzgün formatta döndür
-    const users = response.data.map((user: any) => {
-      // Eğer rol null ise "Rol atanmamış" olarak ayarla
-      if (user.rol === null) {
-        user.rol = "";
-      }
-      return user;
+    // Kullanıcı verilerini işle
+    const users = response.data.data.map((user: any) => {
+      return {
+        ...user,
+        // MongoDB veritabanında user.role olarak tutuluyor rol bilgisi
+        rol: user.role || "",
+      };
     });
 
     const { setUsers } = useUsers.getState();
@@ -55,13 +55,13 @@ export async function getUserById(id: string) {
     }
 
     // Kullanıcı bilgilerini al
-    const response = await axios.get(`http://localhost:1337/api/users/${id}`, {
+    const response = await axios.get(`http://localhost:5000/api/users/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
     });
 
-    return response.data;
+    return response.data.data;
   } catch (error: any) {
     console.error("Kullanıcı bilgileri alınırken hata:", error);
     throw new Error(error.message || "Kullanıcı bilgileri alınamadı.");
@@ -69,7 +69,7 @@ export async function getUserById(id: string) {
 }
 
 // Kullanıcı rolünü güncelle
-export async function updateUserRole(userId: number, newRole: string) {
+export async function updateUserRole(userId: string, newRole: string) {
   try {
     // JWT token'ı al
     const { getJwt } = useAuthStore.getState();
@@ -82,10 +82,10 @@ export async function updateUserRole(userId: number, newRole: string) {
 
     console.log(`Kullanıcı ID: ${userId} için rol güncelleniyor: ${newRole}`);
 
-    // Kullanıcı rolünü güncelle
+    // MongoDB API'ye kullanıcı rolü güncelleme isteği gönder
     const response = await axios.put(
-      `http://localhost:1337/api/users/${userId}`,
-      { rol: newRole },
+      `http://localhost:5000/api/users/${userId}/role`,
+      { role: newRole }, // MongoDB API'de "role" olarak gönderiliyor
       {
         headers: {
           Authorization: `Bearer ${token}`,

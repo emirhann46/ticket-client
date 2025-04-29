@@ -5,7 +5,7 @@ import { FeaturedEvents } from "@/app/components/events/featured-events";
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-// Kategori tipi tanımlama
+// Kategori tipi
 interface Category {
   id: number;
   attributes: {
@@ -16,33 +16,27 @@ interface Category {
 }
 
 export default function Home() {
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Kategorileri Strapi'den çekme
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get('http://localhost:1337/api/categories');
+        const response = await axios.get('http://localhost:5000/api/categories');
         if (response.data && response.data.data) {
           setCategories(response.data.data);
-          console.log(categories)
         }
-        setIsLoading(false);
       } catch (error) {
         console.error("Kategoriler yüklenirken hata oluştu:", error);
+      } finally {
         setIsLoading(false);
       }
     };
 
     fetchCategories();
-
   }, []);
 
-  
-  // Kategori icon mapping'i
   const getCategoryIcon = (categoryName: string) => {
-    // Kategori adına göre ikon seçimi
     switch (categoryName.toLowerCase()) {
       case "konser":
         return (props: any) => (
@@ -56,7 +50,6 @@ export default function Home() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
         );
-      // Diğer kategoriler için ikonlar
       default:
         return (props: any) => (
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
@@ -131,65 +124,23 @@ export default function Home() {
               </div>
             ) : categories.length > 0 ? (
               categories.map((category) => {
-                const id = category?.id;
-                const attributes = category?.attributes;
-                if (!attributes) return null; // attributes yoksa render etme
-              
-                const CategoryIcon = getCategoryIcon(attributes.isim);
-              
+                const id = category.id;
+                const { isim, slug } = category.attributes;
+                const Icon = getCategoryIcon(isim);
                 return (
-                  <Link
-                    key={id}
-                    href={`/events?category=${id}`}
-                    className="group"
-                  >
-                    <div className="relative rounded-lg border border-border overflow-hidden bg-card transition-all duration-200 group-hover:border-primary group-hover:shadow-md">
-                      <div className="h-48 bg-muted flex items-center justify-center">
-                        <CategoryIcon className="h-12 w-12 text-primary" />
-                      </div>
-                      <div className="p-6">
-                        <h3 className="text-lg font-medium text-foreground group-hover:text-primary">
-                          {attributes.isim}
-                        </h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {attributes.aciklama}
-                        </p>
-                      </div>
+                  <Link key={id} href={`/events/category/${slug}`}>
+                    <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+                      <Icon className="h-12 w-12 text-primary mb-4" />
+                      <h3 className="text-lg font-semibold text-foreground">{isim}</h3>
                     </div>
                   </Link>
                 );
               })
             ) : (
               <div className="col-span-full text-center">
-                <p>Henüz kategori bulunmamaktadır.</p>
+                <p>Hiç kategori bulunamadı.</p>
               </div>
             )}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-primary">
-        <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-16 lg:px-8 lg:flex lg:items-center lg:justify-between">
-          <h2 className="text-3xl font-extrabold tracking-tight text-primary-foreground sm:text-4xl">
-            <span className="block">Etkinlik mi düzenliyorsunuz?</span>
-            <span className="block">Hemen organizatör hesabı oluşturun.</span>
-          </h2>
-          <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
-            <div className="inline-flex rounded-md shadow">
-              <Link href="/organizer-application">
-                <Button size="lg" variant="secondary">
-                  Organizatör Olun
-                </Button>
-              </Link>
-            </div>
-            <div className="ml-3 inline-flex rounded-md shadow">
-              <Link href="/about">
-                <Button size="lg" variant="outline" className="bg-primary-foreground text-primary">
-                  Daha Fazla Bilgi
-                </Button>
-              </Link>
-            </div>
           </div>
         </div>
       </section>
