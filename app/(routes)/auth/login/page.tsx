@@ -11,14 +11,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
-import { startSession } from "@/lib/session";
 import useAuthStore from "@/app/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const { isLoading, setIsLoading, setUser, setJwt, setIsAuthenticated, isAuthenticated } = useAuthStore();
+  const { isLoading, setIsLoading, isAuthenticated } = useAuthStore();
 
   const formSchema = z.object({
     email: z.string().email("Geçerli bir e-posta adresi giriniz"),
@@ -28,7 +27,7 @@ export default function LoginPage() {
   // Kullanıcı zaten giriş yapmışsa ana sayfaya yönlendir
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/");
+      router.replace("/");
     }
   }, [isAuthenticated, router]);
 
@@ -45,28 +44,22 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await login(values.email, values.password);
-      console.log("res", res);
+      // Login işlemi - useAuthStore'u API'den dönen verilerle güncelleyecek
+      await login(values.email, values.password);
 
-      if (!res || !res.user || !res.jwt) {
-        throw new Error("Geçersiz yanıt alındı");
-      }
+      // Başarılı mesajı göster
+      toast.success("Giriş başarılı, ana sayfaya yönlendiriliyorsunuz!");
 
-      setUser(res.user);
-      console.log("res.user", res.user)
-      setJwt(res.jwt);
-      setIsAuthenticated(true);
-
-      toast.success("Giriş başarılı!");
-      // router.push() burada çağrılmıyor, useEffect içinde isAuthenticated değiştiğinde çağrılacak
+      // Ana sayfaya yönlendir
+      router.replace("/");
     } catch (err: any) {
       console.error("Giriş hatası:", err);
-      setError(err?.response?.data?.message || "Giriş sırasında bir hata oluştu");
+      setError(err.message || "Giriş sırasında bir hata oluştu");
+      toast.error(err.message || "Giriş başarısız oldu");
     } finally {
       setIsLoading(false);
     }
   }
-
 
   return (
     <div className="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-background">
@@ -77,7 +70,7 @@ export default function LoginPage() {
         <p className="mt-2 text-center text-sm text-muted-foreground">
           Veya {" "}
           <Link href="/auth/register" className="font-medium text-primary hover:text-primary/70">
-            yeni bir hesap oluşturun
+            Yeni bir hesap oluşturun
           </Link>
         </p>
       </div>
@@ -121,6 +114,11 @@ export default function LoginPage() {
                         </button>
                       </div>
                     </FormControl>
+                    <div className="text-sm text-right mt-1">
+                      <Link href="/auth/forgot-password" className="text-primary hover:text-primary/70">
+                        Şifrenizi mi unuttunuz?
+                      </Link>
+                    </div>
                   </FormItem>
                 )}
               />

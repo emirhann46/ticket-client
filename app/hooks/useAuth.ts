@@ -3,6 +3,14 @@ import { persist } from "zustand/middleware";
 import { User } from "../constans/type";
 import axios from "axios";
 import Cookies from 'js-cookie';
+import { toast } from "react-hot-toast";
+import { startSession, endSession } from "@/lib/session";
+
+// Hata gösterme durumunu kontrol eden değişken
+let isErrorShown = false;
+
+// Auth hata mesajları için tost ID'si
+const AUTH_TOAST_ID = "auth-error";
 
 interface AuthState {
   jwt: string;
@@ -16,7 +24,8 @@ interface AuthState {
   logout: () => void;
   error: string | null;
   getJwt: () => string | null;
-  refreshUserData: () => Promise<void>;
+  refreshUserData: () => Promise<User | null>;
+  checkAdminRole: () => boolean;
 }
 
 const useAuthStore = create<AuthState>()(
@@ -26,90 +35,194 @@ const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      error: null,
 
       setJwt: (jwt: string) => {
-        // JWT'yi hem store'da hem de cookie'de sakla
-        if (typeof window !== 'undefined') {
-          // localStorage'da sakla
-          localStorage.setItem("jwt", jwt);
-
-          // Cookie'de sakla (7 gün geçerli)
-          Cookies.set('jwt', jwt, { expires: 7, path: '/' });
+        if (!jwt) {
+          console.warn("Token boş olamaz");
+          return;
         }
-        set({ jwt });
+
+        // Token'ı hem store'da hem cookie'de sakla
+        try {
+          localStorage.setItem("jwt", jwt);
+          Cookies.set('jwt', jwt, { expires: 7, path: '/' });
+          console.log("Token kaydedildi:", jwt.substring(0, 10) + "...");
+          set({ jwt });
+        } catch (err) {
+          console.error("Token kaydedilirken hata:", err);
+        }
       },
 
       setUser: (userData: any) => {
         if (!userData) {
-          set({ user: null });
+          console.warn("Kullanıcı verisi boş");
+          set({ user: null, isAuthenticated: false });
           return;
         }
 
-        console.log("Gelen kullanıcı verisi:", userData);
+        // Backend'den gelen user verisini normalize et
+        const formattedUser = {
+          ...userData,
+          id: userData._id || userData.id,
+          rol: userData.role || userData.rol,
+          username: userData.username || userData.name || "",
+          email: userData.email || ""
+        };
 
-        set({ user: userData, isAuthenticated: true });
+        // User bilgilerini güncelle
+        set({ user: formattedUser, isAuthenticated: true });
+
+        // User bilgilerini localStorage'a da kaydet
+        try {
+          localStorage.setItem('user', JSON.stringify(formattedUser));
+        } catch (err) {
+          console.error("Kullanıcı bilgileri kaydedilirken hata:", err);
+        }
       },
 
-      setIsAuthenticated: (isAuthenticated: boolean) => set({ isAuthenticated }),
+      setIsAuthenticated: (isAuthenticated: boolean) => {
+        set({ isAuthenticated });
+      },
+
       setIsLoading: (isLoading: boolean) => set({ isLoading }),
 
       logout: () => {
-        // Çıkış yaparken localStorage ve cookie'den JWT'yi temizle
-        if (typeof window !== 'undefined') {
+        console.log("Oturum kapatılıyor");
+
+        // Oturum verilerini temizle
+        endSession();
+
+        // Local storage ve cookie temizliği
+        try {
           localStorage.removeItem("jwt");
+          localStorage.removeItem("user");
           Cookies.remove('jwt', { path: '/' });
+        } catch (err) {
+          console.error("Oturum bilgileri silinirken hata:", err);
         }
+
+        // State'i sıfırla
         set({ jwt: "", user: null, isAuthenticated: false });
+
+        // Hata gösterimi sıfırla
+        isErrorShown = false;
       },
 
-      error: null,
-
-      // JWT'yi almak için yardımcı fonksiyon
       getJwt: () => {
         // Önce store'dan kontrol et
         const storeJwt = get().jwt;
-        if (storeJwt) return storeJwt;
-
-        // Store'da yoksa cookie'den kontrol et
-        if (typeof window !== 'undefined') {
-          const cookieJwt = Cookies.get('jwt');
-          if (cookieJwt) return cookieJwt;
-
-          // Cookie'de yoksa localStorage'dan kontrol et
-          return localStorage.getItem("jwt");
+        if (storeJwt && storeJwt.length > 10) {
+          return storeJwt;
         }
+
+        // Store'da yoksa localStorage veya cookie'den al
+        try {
+          // localStorage'dan kontrol et
+          const localJwt = localStorage.getItem("jwt");
+          if (localJwt && localJwt.length > 10) {
+            // Store'a kaydet ve döndür
+            set({ jwt: localJwt });
+            return localJwt;
+          }
+
+          // Cookie'den kontrol et
+          const cookieJwt = Cookies.get('jwt');
+          if (cookieJwt && cookieJwt.length > 10) {
+            // Store'a kaydet ve döndür
+            set({ jwt: cookieJwt });
+            return cookieJwt;
+          }
+        } catch (err) {
+          console.error("Token alınırken hata:", err);
+        }
+
+        console.warn("getJwt: Geçerli token bulunamadı");
         return null;
       },
 
-      // Kullanıcı bilgilerini sunucudan yeniden yükle
+      checkAdminRole: () => {
+        const { user } = get();
+        return user?.role === "admin";
+      },
+
       refreshUserData: async () => {
+        const { getJwt } = get();
+        const token = getJwt();
+
+        // Token yoksa sessiz bir şekilde çık
+        if (!token) {
+          console.warn("refreshUserData: Token bulunamadı");
+          get().logout();
+          return null;
+        }
+
+        set({ isLoading: true });
+
         try {
-          const { getJwt, setUser } = get();
-          const token = getJwt();
+          console.log("refreshUserData: API isteği yapılıyor");
 
-          if (!token) {
-            console.error("Yetkilendirme token'ı bulunamadı");
-            return;
-          }
-
-          // Kullanıcı bilgilerini API'den al
-          const response = await axios.get("http://localhost:1337/api/users/me", {
+          // API isteği yap - token'ı Bearer olarak gönder
+          const response = await axios.get("http://localhost:5000/api/users/me", {
             headers: {
-              Authorization: `Bearer ${token}`
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
             }
           });
 
-          if (response.data) {
-            console.log("Kullanıcı bilgileri güncellendi:", response.data);
-            setUser(response.data);
+          console.log("API yanıtı:", response.data);
+
+          // Başarılı yanıt durumu
+          if (response?.data?.success && response?.data?.user) {
+            // User bilgilerini güncelle
+            get().setUser(response.data.user);
+            set({ isLoading: false, isAuthenticated: true });
+            isErrorShown = false; // Başarılı istek, hata bayrağını sıfırla
+            return response.data.user;
+          } else {
+            console.warn("API yanıtında beklenen user verisi bulunamadı:", response.data);
+            throw new Error("Geçersiz API yanıtı");
           }
-        } catch (error) {
-          console.error("Kullanıcı bilgileri güncellenirken hata oluştu:", error);
+        } catch (error: any) {
+          console.error("Kullanıcı verisi yenileme hatası:", error);
+
+          // Hata detaylarını kaydet
+          if (error.response) {
+            console.error("Hata yanıtı:", {
+              status: error.response.status,
+              statusText: error.response.statusText,
+              data: error.response.data
+            });
+          }
+
+          // 401 veya 403 hataları - token süresi dolmuş veya geçersiz
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            console.warn("Yetki hatası (401/403) - logout yapılıyor");
+            get().logout();
+
+            // Sadece bir kez hata göster
+            if (!isErrorShown) {
+              isErrorShown = true;
+              toast.error("Oturum süreniz doldu, lütfen tekrar giriş yapın", {
+                id: AUTH_TOAST_ID,
+                duration: 4000
+              });
+            }
+          }
+
+          set({ isLoading: false });
+          return null;
         }
       }
     }),
     {
       name: "auth-storage",
+      // Sadece gerekli alanları sakla
+      partialize: (state) => ({
+        jwt: state.jwt,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated
+      }),
     }
   )
 );

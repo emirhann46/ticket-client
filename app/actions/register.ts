@@ -1,27 +1,42 @@
 import axios from "axios";
+import { toast } from "react-hot-toast";
 
-const Urls = `http://localhost:1337/api/auth/local/register`;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || `http://localhost:5000`;
+
 export const register = async (username: string, email: string, password: string) => {
   try {
-    console.log("Kayıt URL'si:", Urls);
-    console.log("Gönderilen veriler:", { username, email, password });
-
-    // Varsayılan olarak user rolü atanacak
-    const response = await axios.post(Urls, {
+    const response = await axios.post(`${API_URL}/api/auth/register`, {
       username,
       email,
       password
     });
 
-    console.log("Kayıt başarılı:", response.data);
-    return response.data;
+    // Backend'den gelen yanıtı kontrol et
+    const { token, user } = response.data;
+
+    if (!token || !user) {
+      throw new Error("Kayıt başarılı ancak giriş yapılamadı");
+    }
+
+    return {
+      user,
+      jwt: token
+    };
+
   } catch (error: any) {
     console.error("Kayıt hatası:", error);
-    console.error("Hata detayları:", error.response?.data);
-    console.error("Hata durumu:", error.response?.status);
-    console.error("Hata mesajı:", error.response?.data?.error?.message);
-    console.error("Hata detayları:", error.response?.data?.error?.details);
-    throw error;
+
+    if (error.response?.status === 409) {
+      throw new Error("Bu e-posta adresi zaten kullanılıyor");
+    } else if (error.response?.status === 400) {
+      throw new Error(error.response.data.message || "Geçersiz kayıt bilgileri");
+    } else if (error.message === "Network Error") {
+      throw new Error("Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin");
+    } else if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+
+    throw new Error("Kayıt sırasında bir hata oluştu");
   }
 };
 

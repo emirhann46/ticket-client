@@ -10,7 +10,6 @@ import useAuthStore from "@/app/hooks/useAuth";
 import { toast } from "react-hot-toast";
 import MobileMenu from "./mobile-menu";
 
-
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -19,147 +18,101 @@ export function Navbar() {
   const [isClient, setIsClient] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Sadece istemci tarafında çalıştığından emin ol
+  // SSR/CSR uyumsuzluğunu önle
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   // Kullanıcı rolünü doğru şekilde al
-  console.log("Navbar - Kullanıcı:", user);
-  const userRole = user?.rol;
+  const userRole = user?.role || user?.role;
 
-  // Sayfa değiştiğinde kullanıcı bilgilerini güncelle
-  useEffect(() => {
-    if (isClient && isAuthenticated) {
-      refreshUserData().catch(console.error);
-    }
-  }, [pathname, isClient, isAuthenticated, refreshUserData]);
-
-  // Debug için
-  useEffect(() => {
-    if (isClient) {
-      console.log("Navbar - Kullanıcı:", user);
-      console.log("Navbar - Kullanıcı rolü:", userRole);
-      console.log("Navbar - Kimlik doğrulama durumu:", isAuthenticated);
-    }
-  }, [user, userRole, isAuthenticated, isClient]);
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  const handleLogout = () => {
-    logout();
-    // Çıkış yapıldıktan sonra ana sayfaya yönlendir
-    window.location.href = "/";
-  };
-
-  // Kullanıcı bilgilerini manuel olarak yenile
-  const handleRefreshUserData = async () => {
-    if (!isAuthenticated) return;
-
-    setIsRefreshing(true);
-    toast.loading("Kullanıcı bilgileri güncelleniyor...", { id: "refreshUser" });
-
-    try {
-      await refreshUserData();
-      toast.success("Kullanıcı bilgileri güncellendi.", { id: "refreshUser" });
-
-      // Kullanıcı admin değilse ve admin sayfasındaysa ana sayfaya yönlendir
-      console.log("Navbar - Kullanıcı rolüymüş:", userRole);
-      if (userRole !== "admin" && pathname.startsWith("/admin")) {
-        toast.error("Admin yetkileriniz değiştirildi. Ana sayfaya yönlendiriliyorsunuz.");
-        router.push("/");
-      }
-    } catch (error) {
-      toast.error("Kullanıcı bilgileri güncellenemedi.", { id: "refreshUser" });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
+  // Ana menü linkleri
   const navLinks = [
     { href: "/", label: "Ana Sayfa", icon: Home },
     { href: "/events", label: "Etkinlikler", icon: CalendarDays },
   ];
 
-  // Admin için özel linkler
-  const adminLinks = [
-    { href: "/admin", label: "Admin Paneli", icon: UserCircle }, // Genel yönetim için
-    { href: "/admin/users", label: "Kullanıcılar", icon: Users }, // Birden fazla kullanıcı için
-    { href: "/admin/requests", label: "İstekler", icon: Inbox }, // Gelen istekleri temsil eden bir ikon
-    { href: "/admin/create", label: "Etkinlik Ekle", icon: PlusCircle }, // Yeni bir şey eklemek için artı ikonu
-    { href: "/profile", label: "Profil", icon: User }, // Kullanıcı profilini belirtmek için
-  ];
+  // Rol bazlı linkler
+  const getRoleBasedLinks = () => {
+    if (!user) return [];
 
-  // Normal kullanıcı linkleri
-  const userLinks = [
-    { href: "/tickets", label: "Biletlerim", icon: Ticket },
-    { href: "/cart", label: "Sepet", icon: ShoppingCart },
-    { href: "/coupons", label: "Kuponlarım", icon: Gift },
-    { href: "/profile", label: "Profil", icon: UserCircle },
-  ];
+    const links = [
+      { href: "/profile", label: "Profil", icon: User },
+      { href: "/tickets", label: "Biletlerim", icon: Ticket },
+      { href: "/cart", label: "Sepet", icon: ShoppingCart },
+    ];
 
-  // Organizatör linkleri
-  const organizerLinks = [
-    { href: "/organizer", label: "Organizatör Paneli", icon: UserCircle },
-    { href: "/organizer/events", label: "Etkinliklerim", icon: Ticket },
-    { href: "/profile", label: "Profil", icon: UserCircle },
-  ];
-
-  // Kullanıcı rolüne göre aktif linkleri belirle
-  let activeLinks: any[] = [];
-
-  // İstemci tarafında ve kimlik doğrulaması yapılmışsa linkleri göster
-  if (isClient && isAuthenticated) {
     if (userRole === "admin") {
-      activeLinks = adminLinks;
-    } else if (userRole === "organizer") {
-      activeLinks = organizerLinks;
-    } else {
-      activeLinks = userLinks;
+      links.push({ href: "/admin", label: "Admin Panel", icon: Users });
     }
-  }
 
-  // Sayfa sunucu tarafında render ediliyorsa veya kullanıcı bilgileri henüz yüklenmemişse
-  // sadece temel içeriği göster
+    if (userRole === "organizer") {
+      links.push({ href: "/organizer/dashboard", label: "Organizatör Panel", icon: Building });
+    }
+
+    if (!["admin", "organizer"].includes(userRole || '')) {
+      links.push({ href: "/organizer-application", label: "Organizatör Ol", icon: PlusCircle });
+    }
+
+    return links;
+  };
+
+  const activeLinks = getRoleBasedLinks();
+
+  const handleLogout = () => {
+    logout();
+    toast.success("Başarıyla çıkış yapıldı");
+    setMobileMenuOpen(false);
+    router.push("/");
+  };
+
+  // Kullanıcı bilgilerini yenile
+  const handleRefreshUserData = async () => {
+    if (!isAuthenticated) return;
+
+    setIsRefreshing(true);
+    toast.loading("Bilgiler güncelleniyor...", { id: "refresh" });
+
+    try {
+      await refreshUserData();
+      toast.success("Bilgiler güncellendi", { id: "refresh" });
+
+      // Kullanıcının yetkisi değiştiyse uygun sayfaya yönlendir
+      if (userRole !== "admin" && pathname.startsWith("/admin")) {
+        toast.error("Admin yetkiniz kaldırıldı");
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("Bilgiler güncellenirken hata:", error);
+      toast.error("Bilgiler güncellenemedi", { id: "refresh" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // CSR/SSR uyumsuzluğunu önle
   if (!isClient) {
-    return (
-      <nav className="bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <span className="text-2xl font-bold text-primary">BiletApp</span>
-              </div>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
-              <div className="h-5 w-5" /> {/* Tema değiştirici isdsadasçin yer tutucu */}
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
+    return null;
   }
 
   return (
     <nav className="bg-background border-b border-border">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="text-2xl font-bold text-primary">
-                BiletApp
-              </Link>
-            </div>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo ve Ana Menü */}
+          <div className="flex items-center">
+            <Link href="/" className="text-xl font-bold">
+              Logo
+            </Link>
+
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`inline-flex justify-center items-center px-3 pt-1 border-b-2 text-sm font-medium cursor-pointer ${pathname === link.href
-                    ? "border-primary text-primary"
-                    : "border-transparent text-foreground hover:border-border hover:text-primary"
+                  className={`inline-flex justify-center items-center px-3 lg:mr-1 pt-1 border-b-2 text-sm font-medium cursor-pointer ${pathname === link.href
+                      ? "border-primary text-primary"
+                      : "border-transparent text-foreground hover:border-border hover:text-primary"
                     }`}
                 >
                   {link.label}
@@ -167,52 +120,57 @@ export function Navbar() {
               ))}
             </div>
           </div>
+
+          {/* Sağ Menü */}
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
             <ThemeSwitcher />
 
-            {isAuthenticated ? (
-              <>
-                {activeLinks.map((link: any) => (
+            {isAuthenticated && user ? (
+              <div className="flex items-center space-x-4">
+                {activeLinks.map((link) => (
                   <Link key={link.href} href={link.href}>
-                    <div
-                      className={`flex flex-col items-center px-3 cursor-pointer ${pathname === link.href ? "bg-accent" : ""
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`flex w-18 flex-col p-4 cursor-pointer ${pathname === link.href ? "bg-accent" : ""
                         }`}
                     >
                       <link.icon className="h-5 w-5" />
-                      <span className="text-xs mt-1">{link.label}</span>
-                    </div>
+                      <span className="text-xs mt-1 mb-1">{link.label}</span>
+                    </Button>
                   </Link>
                 ))}
+
                 <Button
-                  variant="link"
+                  variant="ghost"
                   size="icon"
                   onClick={handleLogout}
-                  className="flex px-2 flex-col items-center cursor-pointer"
+                  className="flex flex-col items-center"
                 >
                   <LogOut className="h-5 w-5" />
-                  <span className="text-xs">Çıkış Yap</span>
+                  <span className="text-xs mt-1">Çıkış</span>
                 </Button>
-              </>
+              </div>
             ) : (
-              <>
+              <div className="flex space-x-2">
                 <Link href="/auth/login">
-                  <Button variant="ghost" className="cursor-pointer">Giriş Yap</Button>
+                  <Button variant="ghost">Giriş Yap</Button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button className="cursor-pointer">Kayıt Ol</Button>
+                  <Button>Kayıt Ol</Button>
                 </Link>
-              </>
+              </div>
             )}
           </div>
+
+          {/* Mobil Menü Butonu */}
           <div className="flex items-center sm:hidden">
             <Button
               variant="ghost"
               size="icon"
-              onClick={toggleMobileMenu}
-              aria-expanded={mobileMenuOpen}
-              className="relative z-20"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="inline-flex items-center justify-center"
             >
-              <span className="sr-only">Menüyü Aç</span>
               {mobileMenuOpen ? (
                 <X className="h-6 w-6" />
               ) : (
@@ -221,9 +179,9 @@ export function Navbar() {
             </Button>
           </div>
         </div>
-      </div>
+      </div >
 
-      {/* Mobile menu - Using the MobileMenu component */}
+      {/* Mobil Menü */}
       <MobileMenu
         isOpen={mobileMenuOpen}
         navLinks={navLinks}
@@ -235,6 +193,6 @@ export function Navbar() {
         handleRefreshUserData={handleRefreshUserData}
         isRefreshing={isRefreshing}
       />
-    </nav>
+    </nav >
   );
 }

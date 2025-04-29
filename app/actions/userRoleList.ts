@@ -1,20 +1,33 @@
 import axios from "axios";
+import useAuthStore from "../hooks/useAuth";
 
 export const getOrganizers = async () => {
-  const jwt = localStorage.getItem("jwt");
-  if (!jwt) {
+  // JWT token'ı al
+  const { getJwt } = useAuthStore.getState();
+  const token = getJwt();
+
+  if (!token) {
+    console.error("Yetkilendirme token'ı bulunamadı");
     throw new Error("Token bulunamadı");
   }
 
   try {
-    const response = await axios.get("http://localhost:1337/api/users?filters[rol][$eq]=organizer", { 
+    // MongoDB API'den organizatör rolündeki kullanıcıları getir
+    // API'niz rol filtresi özelliği eklemek gerekirse, backend'i güncelleyebilir
+    // veya tüm kullanıcıları alıp client-side filtreleme yapabilirsiniz.
+    const response = await axios.get("http://localhost:5000/api/users", {
       headers: {
-        Authorization: `Bearer ${jwt}`,
-        "Content-Type": "application/json", 
-      } 
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      }
     });
 
-    return response.data;
+    // Sadece organizatör rolündeki kullanıcıları filtrele
+    const organizers = response.data.data.filter(
+      (user: any) => user.role === 'organizer'
+    );
+
+    return organizers;
   } catch (error) {
     console.error("Organizatörler getirilirken hata oluştu:", error);
     throw error;

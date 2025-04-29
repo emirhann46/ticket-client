@@ -11,35 +11,70 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { refreshUserData, getJwt, checkAdminRole, user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    // Client tarafında çalıştığından emin ol
-    if (typeof window !== "undefined") {
-      // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
-      if (!isAuthenticated) {
-        toast.error("Bu sayfaya erişmek için giriş yapmalısınız.");
-        router.push("/auth/login");
-        return;
+    let isMounted = true;
+
+    const verifyAdmin = async () => {
+      try {
+        setLoading(true);
+
+        // Token kontrolü
+        const token = getJwt();
+        if (!token) {
+          if (isMounted) {
+            toast.error("Bu sayfaya erişmek için giriş yapmalısınız.");
+            router.push("/auth/login");
+          }
+          return;
+        }
+
+        // Kullanıcı bilgilerini yenile
+        const userData = await refreshUserData();
+
+        // Component unmount olduysa işlemi durdur
+        if (!isMounted) return;
+
+        if (!userData) {
+          toast.error("Kullanıcı bilgileri alınamadı.");
+          router.push("/auth/login");
+          return;
+        }
+
+        // Admin rolünü kontrol et
+        if (userData.rol !== "admin") {
+          toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
+          router.push("/");
+          return;
+        }
+
+        // Yetkilendirme başarılı
+        setAuthorized(true);
+      } catch (error) {
+        if (isMounted) {
+          console.error("Yetkilendirme kontrolü sırasında hata:", error);
+          toast.error("Yetkilendirme hatası oluştu.");
+          router.push("/auth/login");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
+    };
 
-      // Kullanıcı admin değilse ana sayfaya yönlendir
-      if (user?.rol !== "admin") {
-        toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
-        router.push("/");
-        return;
-      }
+    verifyAdmin();
 
-      // Kullanıcı admin ise erişime izin ver
-      setIsAuthorized(true);
-      setIsLoading(false);
-    }
-  }, [isAuthenticated, user, router]);
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
-  // Yükleme durumunda basit bir yükleniyor göstergesi
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -50,12 +85,10 @@ export default function AdminLayout({
     );
   }
 
-  // Yetkisiz erişim durumunda hiçbir şey gösterme (zaten yönlendirme yapılacak)
-  if (!isAuthorized) {
+  if (!authorized) {
     return null;
   }
 
-  // Yetkili kullanıcı için içeriği göster
   return (
     <div className="admin-layout">
       {children}

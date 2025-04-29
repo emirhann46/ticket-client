@@ -1,37 +1,63 @@
-"use client";
+'use client';
 
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/app/components/theme/theme-provider";
-import { Navbar } from "@/app/components/layout/navbar";
-import { Footer } from "@/app/components/layout/footer";
-import { Toaster } from "react-hot-toast";
-import useAuthStore from "@/app/hooks/useAuth";
-
-// metadata'yı ayrı bir dosyadan içe aktar
-import { metadata } from "@/app/metadata";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Navbar } from '@/app/components/layout/navbar'
+import { Toaster } from "react-hot-toast"
+import "./globals.css"
+import useAuthStore from "./hooks/useAuth";
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Footer } from './components/layout/footer';
+import { ThemeProvider } from './components/theme/theme-provider';
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
-  const { isAuthenticated } = useAuthStore();
+}: {
+  children: React.ReactNode
+}) {
+  const { isAuthenticated, refreshUserData, user, getJwt } = useAuthStore();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Korumalı sayfalar listesi
+  const protectedRoutes = ['/profile', '/admin', '/tickets', '/cart', '/organizer'];
+
+  // Auth kontrolü ve token doğrulama
+  useEffect(() => {
+    const token = getJwt();
+    const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+
+    // Korumalı sayfa ve token varsa
+    if (isProtectedRoute) {
+      // Giriş yapılmamışsa login sayfasına yönlendir
+      if (!isAuthenticated) {
+        console.log("Korumalı sayfa erişimi - giriş yapılmamış");
+        router.replace('/auth/login');
+        return;
+      }
+
+      // Token var ve authenticated ama user bilgileri yoksa veya yenilenmesi gerekiyorsa
+      if (isAuthenticated && token) {
+        console.log("Kullanıcı bilgileri yenileniyor");
+        refreshUserData().catch((err) => {
+          console.error("Token doğrulama hatası:", err);
+        });
+      }
+    }
+  }, [pathname, isAuthenticated, refreshUserData, router, getJwt]);
 
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-      >
-        <Toaster />
+      <body className={` antialiased min-h-screen flex flex-col`}>
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#333',
+              color: '#fff',
+            },
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

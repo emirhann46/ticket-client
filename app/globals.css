@@ -127,3 +127,11 @@
     @apply bg-background text-foreground;
   }
 }
+.scrollbar-wrapper::-webkit-scrollbar {
+  height: 8px; /* Yatay scrollbar yüksekliği */
+}
+
+.scrollbar-wrapper::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}

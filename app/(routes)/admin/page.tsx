@@ -3,7 +3,7 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, BarChart3, Calendar, Settings, ShoppingBag, Ticket, Building2 } from "lucide-react"
+import { Users, BarChart3, Calendar, Building2, Inbox, CheckSquare } from "lucide-react"
 
 function AdminPage() {
   const router = useRouter()
@@ -13,7 +13,7 @@ function AdminPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Admin Paneli</h1>
-          <p className="text-muted-foreground mt-1">Uygulamanızı burassdan yönetin</p>
+          <p className="text-muted-foreground mt-1">Uygulamanızı buradan yönetin</p>
         </div>
       </div>
 
@@ -47,7 +47,38 @@ function AdminPage() {
               <Building2 className="h-4 w-4" />
               Organizatörler
             </Button>
+          </CardFooter>
+        </Card>
 
+        {/* Başvuru Yönetimi Kartı */}
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-2">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-2">
+              <Inbox className="h-6 w-6 text-amber-700" />
+            </div>
+            <CardTitle className="text-xl">Başvuru Yönetimi</CardTitle>
+            <CardDescription>Organizatör ve etkinlik başvurularını yönetin</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-gray-500">
+            Organizatör başvurularını ve etkinlik başvurularını görüntüleyin, onaylayın veya reddedin.
+          </CardContent>
+          <CardFooter className="flex flex-col items-start gap-2">
+            <Button
+              className="w-full flex items-center justify-start gap-2"
+              onClick={() => router.push('/admin/organizer-requests')}
+              variant="outline"
+            >
+              <CheckSquare className="h-4 w-4" />
+              Organizatör Başvuruları
+            </Button>
+            <Button
+              className="w-full flex items-center justify-start gap-2"
+              onClick={() => router.push('/admin/event-requests')}
+              variant="outline"
+            >
+              <Calendar className="h-4 w-4" />
+              Etkinlik Başvuruları
+            </Button>
           </CardFooter>
         </Card>
 
@@ -57,7 +88,7 @@ function AdminPage() {
             <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-2">
               <Calendar className="h-6 w-6 text-green-700" />
             </div>
-            <CardTitle className="text-xl">Etkinlik Yönetimi</CardTitle>
+            <CardTitle className="text-xl">İçerik Yönetimi</CardTitle>
             <CardDescription>Etkinlikleri ve kategorileri yönetin</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-gray-500">
@@ -79,62 +110,6 @@ function AdminPage() {
             >
               <BarChart3 className="h-4 w-4" />
               Kategoriler
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Bilet ve Satış Yönetimi Kartı */}
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-2">
-              <Ticket className="h-6 w-6 text-purple-700" />
-            </div>
-            <CardTitle className="text-xl">Bilet ve Satışlar</CardTitle>
-            <CardDescription>Bilet satışlarını ve ödemeleri yönetin</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-gray-500">
-            Bilet satışlarını takip edin, ödeme işlemlerini görüntüleyin ve raporlar oluşturun.
-          </CardContent>
-          <CardFooter className="flex flex-col items-start gap-2">
-            <Button
-              className="w-full flex items-center justify-start gap-2"
-              onClick={() => router.push('/admin/tickets')}
-              variant="outline"
-            >
-              <Ticket className="h-4 w-4" />
-              Biletler
-            </Button>
-            <Button
-              className="w-full flex items-center justify-start gap-2"
-              onClick={() => router.push('/admin/sales')}
-              variant="outline"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              Satışlar
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Sistem Ayarları Kartı */}
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-2">
-              <Settings className="h-6 w-6 text-amber-700" />
-            </div>
-            <CardTitle className="text-xl">Sistem Ayarları</CardTitle>
-            <CardDescription>Uygulama ayarlarını yapılandırın</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-gray-500">
-            Sistem ayarlarını yapılandırın, site içeriğini düzenleyin ve genel ayarları yönetin.
-          </CardContent>
-          <CardFooter className="flex flex-col items-start gap-2">
-            <Button
-              className="w-full flex items-center justify-start gap-2"
-              onClick={() => router.push('/admin/settings')}
-              variant="outline"
-            >
-              <Settings className="h-4 w-4" />
-              Genel Ayarlar
             </Button>
           </CardFooter>
         </Card>
