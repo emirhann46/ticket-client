@@ -15,49 +15,66 @@ import { CheckCircle, XCircle, Clock } from "lucide-react";
 import { toast } from "react-hot-toast";
 import useAuthStore from "@/app/hooks/useAuth";
 
+// MongoDB formatına uygun interface
 interface OrganizerRequest {
-  id: number;
-  attributes: {
-    baslik: string;
-    aciklama: string;
-    durum: "beklemede" | "onaylandi" | "reddedildi";
-    createdAt: string;
-    updatedAt: string;
-    user: {
-      data: {
-        id: number;
-        attributes: {
-          username: string;
-          email: string;
-        };
-      };
-    };
+  _id: string;
+  userId: {
+    _id: string;
+    username: string;
+    email: string;
+    firstName: string;
+    lastName: string;
   };
+  title: string;
+  description: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
 }
 
 export default function OrganizerRequestsPage() {
   const [requests, setRequests] = useState<OrganizerRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { jwt } = useAuthStore();
+  const { getJwt } = useAuthStore();
 
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
+
+      // JWT token al
+      const token = getJwt();
+      if (!token) {
+        toast.error("Oturum bilgilerinize ulaşılamadı, lütfen tekrar giriş yapın.");
+        return;
+      }
+
+      console.log("Organizatör başvuruları getiriliyor...");
       const response = await axios.get(
-        "http://localhost:1337/api/organizer-requests?populate=user",
+        "http://localhost:5000/api/organizer-requests",
         {
           headers: {
-            Authorization: `Bearer ${jwt}`,
-          },
+            Authorization: `Bearer ${token}`
+          }
         }
       );
 
-      if (response.data && response.data.data) {
+      console.log("Gelen veri:", response.data);
+
+      if (response.data?.success && response.data?.data) {
         setRequests(response.data.data);
+      } else {
+        console.warn("API yanıtı beklenen formatta değil:", response.data);
+        toast.error("Veri formatı beklenenden farklı");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Organizatör başvuruları yüklenirken hata:", error);
-      toast.error("Organizatör başvuruları yüklenemedi");
+      if (error.response?.status === 403) {
+        toast.error("Bu sayfayı görüntülemek için gereken yetkiniz yok.");
+      } else {
+        toast.error("Organizatör başvuruları yüklenemedi");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -65,68 +82,61 @@ export default function OrganizerRequestsPage() {
 
   useEffect(() => {
     fetchRequests();
-  }, [jwt]);
+  }, []);
 
-  const handleStatusChange = async (id: number, newStatus: string) => {
+  const handleStatusChange = async (id: string, newStatus: string) => {
     try {
+      // JWT token al
+      const token = getJwt();
+      if (!token) {
+        toast.error("Oturum bilgilerinize ulaşılamadı, lütfen tekrar giriş yapın.");
+        return;
+      }
+
+      console.log(`Başvuru durumu güncelleniyor. ID: ${id}, Yeni Durum: ${newStatus}`);
+
       const response = await axios.put(
-        `http://localhost:1337/api/organizer-requests/${id}`,
-        {
-          data: { durum: newStatus }
-        },
+        `http://localhost:5000/api/organizer-requests/${id}`,
+        { status: newStatus },
         {
           headers: {
-            Authorization: `Bearer ${jwt}`,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
           },
         }
       );
 
-      if (response.data) {
-        // Kullanıcı onaylandıysa, rolünü değiştir
-        if (newStatus === "onaylandi") {
-          const request = requests.find(req => req.id === id);
-          if (request) {
-            const userId = request.attributes.user.data.id;
-            await axios.put(
-              `http://localhost:1337/api/users/${userId}`,
-              {
-                rol: "organizer"
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${jwt}`,
-                },
-              }
-            );
-          }
-        }
+      console.log("Güncelleme yanıtı:", response.data);
 
-        toast.success(`Başvuru durumu güncellendi: ${newStatus}`);
-        fetchRequests();
+      if (response.data?.success) {
+        toast.success(`Başvuru ${newStatus === "approved" ? "onaylandı" : newStatus === "rejected" ? "reddedildi" : "beklemeye alındı"}.`);
+        fetchRequests(); // Listeyi yenile
+      } else {
+        toast.error("Güncelleme başarısız oldu");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Başvuru durumu güncellenirken hata:", error);
-      toast.error("Başvuru durumu güncellenemedi");
+      toast.error(error.response?.data?.message || "Başvuru durumu güncellenemedi");
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "beklemede":
+      case "pending":
         return (
           <div className="flex items-center text-amber-500">
             <Clock className="w-4 h-4 mr-1" />
             <span>Bekliyor</span>
           </div>
         );
-      case "onaylandi":
+      case "approved":
         return (
           <div className="flex items-center text-green-500">
             <CheckCircle className="w-4 h-4 mr-1" />
             <span>Onaylandı</span>
           </div>
         );
-      case "reddedildi":
+      case "rejected":
         return (
           <div className="flex items-center text-red-500">
             <XCircle className="w-4 h-4 mr-1" />
@@ -136,6 +146,16 @@ export default function OrganizerRequestsPage() {
       default:
         return <span>{status}</span>;
     }
+  };
+
+  // Tarihi formatla
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("tr-TR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   if (isLoading) {
@@ -158,34 +178,39 @@ export default function OrganizerRequestsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {requests.map((request) => (
-            <Card key={request.id} className="overflow-hidden">
+            <Card key={request._id} className="overflow-hidden">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle>{request.attributes.baslik}</CardTitle>
+                    <CardTitle>{request.title}</CardTitle>
                     <CardDescription>
-                      Başvuran: {request.attributes.user.data.attributes.username}
+                      Başvuran: {request.userId.username || request.userId.firstName} ({request.userId.email})
                     </CardDescription>
                   </div>
-                  <div>{getStatusBadge(request.attributes.durum)}</div>
+                  <div>{getStatusBadge(request.status)}</div>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  {request.attributes.aciklama}
+                  {request.description}
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Başvuru Tarihi: {new Date(request.attributes.createdAt).toLocaleDateString("tr-TR")}
+                <p className="text-xs text-muted-foreground mt-3">
+                  Başvuru Tarihi: {formatDate(request.createdAt)}
                 </p>
+                {request.reviewedAt && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    İncelenme Tarihi: {formatDate(request.reviewedAt)}
+                  </p>
+                )}
               </CardContent>
               <CardFooter className="flex justify-between bg-muted/30 p-4">
-                {request.attributes.durum === "beklemede" && (
+                {request.status === "pending" && (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
                       className="bg-green-50 text-green-600 hover:bg-green-100"
-                      onClick={() => handleStatusChange(request.id, "onaylandi")}
+                      onClick={() => handleStatusChange(request._id, "approved")}
                     >
                       <CheckCircle className="w-4 h-4 mr-1" /> Onayla
                     </Button>
@@ -193,18 +218,18 @@ export default function OrganizerRequestsPage() {
                       variant="outline"
                       size="sm"
                       className="bg-red-50 text-red-600 hover:bg-red-100"
-                      onClick={() => handleStatusChange(request.id, "reddedildi")}
+                      onClick={() => handleStatusChange(request._id, "rejected")}
                     >
                       <XCircle className="w-4 h-4 mr-1" /> Reddet
                     </Button>
                   </>
                 )}
-                {request.attributes.durum !== "beklemede" && (
+                {request.status !== "pending" && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="bg-amber-50 text-amber-600 hover:bg-amber-100 w-full"
-                    onClick={() => handleStatusChange(request.id, "beklemede")}
+                    onClick={() => handleStatusChange(request._id, "pending")}
                   >
                     <Clock className="w-4 h-4 mr-1" /> Beklemede Olarak İşaretle
                   </Button>

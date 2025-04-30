@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import useAuthStore from "@/app/hooks/useAuth";
 import { toast } from "react-hot-toast";
 
-// Sabit yükleme durumu komponenti - hydration hatalarını önlemek için
+// Sabit yükleme durumu komponenti
 const LoadingComponent = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="text-center">
@@ -15,7 +15,7 @@ const LoadingComponent = () => (
   </div>
 );
 
-export default function AdminLayout({
+export default function OrganizerLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -45,9 +45,9 @@ export default function AdminLayout({
       if (userData) {
         try {
           const user = JSON.parse(userData);
-          const role = user.role || user.rol;
-          if (role === "admin") {
-            console.log("Initial check: Admin rolü doğrulandı");
+          const role = user.role;
+          if (role === "organizer" || role === "admin") {
+            console.log("Initial check: Organizatör/Admin rolü doğrulandı");
             return true;
           }
         } catch (error) {
@@ -73,7 +73,7 @@ export default function AdminLayout({
     // Client tarafında değilsek API çağrısı yapmayı atla
     if (!mounted) return;
 
-    const verifyAdmin = async () => {
+    const verifyOrganizer = async () => {
       try {
         // Zaten yetkili ise tekrar kontrol etme
         if (authorized) return;
@@ -83,36 +83,35 @@ export default function AdminLayout({
         // Token kontrolü
         const token = getJwt();
         if (!token) {
-          console.log("Admin token bulunamadı");
+          console.log("Organizatör token bulunamadı");
           if (isMounted) {
             setLoading(false);
             return;
           }
         }
 
-        // Kullanıcı bilgilerini yenile
+        // Kullanıcı bilgilerini yenile - backend'den güncel bilgileri al
         const userData = await refreshUserData();
 
         // Component unmount olduysa işlemi durdur
         if (!isMounted) return;
 
         if (!userData) {
-          console.log("Admin kullanıcı bilgileri alınamadı");
+          console.log("Organizatör kullanıcı bilgileri alınamadı");
           setLoading(false);
           return;
         }
 
-        // Admin rolünü kontrol et - her iki format için de kontrol et
-        const userRole = userData.role || userData.role;
+        // Organizatör rolünü kontrol et
+        const userRole = userData.role;
 
-        if (userRole === "admin") {
-          console.log("Admin rolü doğrulandı");
+        if (userRole === "organizer" || userRole === "admin") {
+          console.log("Organizatör/Admin rolü doğrulandı");
           setAuthorized(true);
           setLoading(false);
         } else {
-          console.log("Admin rolü doğrulanamadı:", userRole);
+          console.log("Organizatör rolü doğrulanamadı:", userRole);
 
-          // Client tarafında olduğumuzdan emin olduğumuzda toast göster ve yönlendir
           if (mounted) {
             toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
             router.push("/");
@@ -126,13 +125,13 @@ export default function AdminLayout({
       }
     };
 
-    verifyAdmin();
+    verifyOrganizer();
 
     // Cleanup function
     return () => {
       isMounted = false;
     };
-  }, [mounted, user, authorized]);
+  }, [mounted, user, authorized, refreshUserData, getJwt, router]);
 
   // Client tarafında değilsek veya yükleme durumunda sabit bir düzen göster
   if (!mounted || loading) {
@@ -146,7 +145,7 @@ export default function AdminLayout({
 
   // Yetkili ise içeriği göster
   return (
-    <div className="admin-layout">
+    <div className="organizer-layout">
       {children}
     </div>
   );

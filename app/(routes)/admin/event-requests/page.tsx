@@ -16,25 +16,30 @@ import { toast } from "react-hot-toast";
 import useAuthStore from "@/app/hooks/useAuth";
 
 interface EventRequest {
-  id: number;
-  attributes: {
-    baslik: string;
-    aciklama: string;
-    lokasyon: string;
-    tarih: string;
-    durum: "beklemede" | "onaylandi" | "reddedildi";
-    createdAt: string;
-    updatedAt: string;
-    basvuran: {
-      data: {
-        id: number;
-        attributes: {
-          username: string;
-          email: string;
-        };
-      };
-    };
+  _id: string;
+  title: string;
+  description: string;
+  location: string;
+  date: string;
+  price: number;
+  availableTickets: number;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+  organizerId: {
+    _id: string;
+    username: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
   };
+  category: {
+    _id: string;
+    name: string;
+  };
+  adminComment?: string;
+  coverImage?: string;
+  sliderImages?: string[];
 }
 
 export default function EventRequestsPage() {
@@ -46,7 +51,7 @@ export default function EventRequestsPage() {
     try {
       setIsLoading(true);
       const response = await axios.get(
-        "http://localhost:1337/api/event-requests?populate=basvuran",
+        "http://localhost:5000/api/event-requests",
         {
           headers: {
             Authorization: `Bearer ${jwt}`,
@@ -69,43 +74,14 @@ export default function EventRequestsPage() {
     fetchRequests();
   }, [jwt]);
 
-  // Etkinlik onaylanırsa, gerçek bir etkinlik oluştur
-  const createEvent = async (request: EventRequest) => {
-    try {
-      const eventData = {
-        data: {
-          baslik: request.attributes.baslik,
-          aciklama: request.attributes.aciklama,
-          lokasyon: request.attributes.lokasyon,
-          tarih: request.attributes.tarih,
-          fiyat: 0, // Varsayılan değer, sonra güncellenebilir
-          organizer: request.attributes.basvuran.data.id,
-        }
-      };
-
-      const response = await axios.post(
-        "http://localhost:1337/api/events",
-        eventData,
-        {
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-          },
-        }
-      );
-
-      return response.data;
-    } catch (error) {
-      console.error("Etkinlik oluşturulurken hata:", error);
-      throw error;
-    }
-  };
-
-  const handleStatusChange = async (id: number, newStatus: string) => {
+  // Statü değişikliğini işle
+  const handleStatusChange = async (id: string, newStatus: string, adminComment: string = "") => {
     try {
       const response = await axios.put(
-        `http://localhost:1337/api/event-requests/${id}`,
+        `http://localhost:5000/api/event-requests/${id}`,
         {
-          data: { durum: newStatus }
+          status: newStatus,
+          adminComment: adminComment
         },
         {
           headers: {
@@ -114,22 +90,18 @@ export default function EventRequestsPage() {
         }
       );
 
-      if (response.data) {
-        // Başvuru onaylandıysa, etkinliği oluştur
-        if (newStatus === "onaylandi") {
-          const request = requests.find(req => req.id === id);
-          if (request) {
-            try {
-              await createEvent(request);
-              toast.success("Etkinlik başarıyla oluşturuldu!");
-            } catch (error) {
-              toast.error("Etkinlik oluşturulurken bir hata oluştu");
-            }
-          }
+      if (response.data.success) {
+        let message = "";
+        if (newStatus === "approved") {
+          message = "Başvuru onaylandı ve etkinlik oluşturuldu!";
+        } else if (newStatus === "rejected") {
+          message = "Başvuru reddedildi";
+        } else {
+          message = "Başvuru durumu güncellendi";
         }
 
-        toast.success(`Başvuru durumu güncellendi: ${newStatus}`);
-        fetchRequests();
+        toast.success(message);
+        fetchRequests(); // Listeyi yenile
       }
     } catch (error) {
       console.error("Başvuru durumu güncellenirken hata:", error);
@@ -139,21 +111,21 @@ export default function EventRequestsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "beklemede":
+      case "pending":
         return (
           <div className="flex items-center text-amber-500">
             <Clock className="w-4 h-4 mr-1" />
             <span>Bekliyor</span>
           </div>
         );
-      case "onaylandi":
+      case "approved":
         return (
           <div className="flex items-center text-green-500">
             <CheckCircle className="w-4 h-4 mr-1" />
             <span>Onaylandı</span>
           </div>
         );
-      case "reddedildi":
+      case "rejected":
         return (
           <div className="flex items-center text-red-500">
             <XCircle className="w-4 h-4 mr-1" />
@@ -195,44 +167,44 @@ export default function EventRequestsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {requests.map((request) => (
-            <Card key={request.id} className="overflow-hidden">
+            <Card key={request._id} className="overflow-hidden">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle>{request.attributes.baslik}</CardTitle>
+                    <CardTitle>{request.title}</CardTitle>
                     <CardDescription>
-                      Başvuran: {request.attributes.basvuran.data.attributes.username}
+                      Başvuran: {request.organizerId.username}
                     </CardDescription>
                   </div>
-                  <div>{getStatusBadge(request.attributes.durum)}</div>
+                  <div>{getStatusBadge(request.status)}</div>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm mb-4">{request.attributes.aciklama}</p>
+                <p className="text-sm mb-4">{request.description}</p>
 
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center">
                     <Calendar className="mr-2 h-4 w-4" />
-                    <span>{formatDate(request.attributes.tarih)}</span>
+                    <span>{formatDate(request.date)}</span>
                   </div>
                   <div className="flex items-center">
                     <MapPin className="mr-2 h-4 w-4" />
-                    <span>{request.attributes.lokasyon}</span>
+                    <span>{request.location}</span>
                   </div>
                 </div>
 
                 <p className="text-xs text-muted-foreground mt-4">
-                  Başvuru Tarihi: {formatDate(request.attributes.createdAt)}
+                  Başvuru Tarihi: {formatDate(request.createdAt)}
                 </p>
               </CardContent>
               <CardFooter className="flex justify-between bg-muted/30 p-4">
-                {request.attributes.durum === "beklemede" && (
+                {request.status === "pending" && (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
                       className="bg-green-50 text-green-600 hover:bg-green-100"
-                      onClick={() => handleStatusChange(request.id, "onaylandi")}
+                      onClick={() => handleStatusChange(request._id, "approved")}
                     >
                       <CheckCircle className="w-4 h-4 mr-1" /> Onayla ve Etkinlik Oluştur
                     </Button>
@@ -240,18 +212,33 @@ export default function EventRequestsPage() {
                       variant="outline"
                       size="sm"
                       className="bg-red-50 text-red-600 hover:bg-red-100"
-                      onClick={() => handleStatusChange(request.id, "reddedildi")}
+                      onClick={() => {
+                        const comment = prompt("Reddetme sebebini yazın (organizatöre iletilecek):");
+                        if (comment !== null) {
+                          handleStatusChange(request._id, "rejected", comment);
+                        }
+                      }}
                     >
                       <XCircle className="w-4 h-4 mr-1" /> Reddet
                     </Button>
                   </>
                 )}
-                {request.attributes.durum !== "beklemede" && (
+                {request.status === "approved" && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="bg-amber-50 text-amber-600 hover:bg-amber-100 w-full"
-                    onClick={() => handleStatusChange(request.id, "beklemede")}
+                    onClick={() => handleStatusChange(request._id, "pending")}
+                  >
+                    <Clock className="w-4 h-4 mr-1" /> Beklemede Olarak İşaretle
+                  </Button>
+                )}
+                {request.status === "rejected" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-amber-50 text-amber-600 hover:bg-amber-100 w-full"
+                    onClick={() => handleStatusChange(request._id, "pending")}
                   >
                     <Clock className="w-4 h-4 mr-1" /> Beklemede Olarak İşaretle
                   </Button>

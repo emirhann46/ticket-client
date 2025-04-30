@@ -23,8 +23,18 @@ export function Navbar() {
     setIsClient(true);
   }, []);
 
+  // İlk yüklenmede ve rota değiştiğinde kullanıcı bilgilerini yenile
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Her sayfa yüklendiğinde kullanıcı bilgilerini yenile
+      refreshUserData()
+        .then(() => console.log("Kullanıcı bilgileri güncellendi"))
+        .catch(err => console.error("Kullanıcı bilgileri güncellenemedi:", err));
+    }
+  }, [pathname, isAuthenticated]);
+
   // Kullanıcı rolünü doğru şekilde al
-  const userRole = user?.role || user?.role;
+  const userRole = user?.role || "user";
 
   // Ana menü linkleri
   const navLinks = [
@@ -38,8 +48,6 @@ export function Navbar() {
 
     const links = [
       { href: "/profile", label: "Profil", icon: User },
-      { href: "/tickets", label: "Biletlerim", icon: Ticket },
-      { href: "/cart", label: "Sepet", icon: ShoppingCart },
     ];
 
     if (userRole === "admin") {
@@ -47,11 +55,14 @@ export function Navbar() {
     }
 
     if (userRole === "organizer") {
-      links.push({ href: "/organizer/dashboard", label: "Organizatör Panel", icon: Building });
+      links.push({ href: "/organizer", label: "Organizatör Panel", icon: Building });
     }
 
-    if (!["admin", "organizer"].includes(userRole || '')) {
+    if (!["admin", "organizer"].includes(userRole)) {
       links.push({ href: "/organizer-application", label: "Organizatör Ol", icon: PlusCircle });
+      links.push(
+        { href: "/tickets", label: "Biletlerim", icon: Ticket },
+        { href: "/cart", label: "Sepet", icon: ShoppingCart },);
     }
 
     return links;
@@ -74,13 +85,19 @@ export function Navbar() {
     toast.loading("Bilgiler güncelleniyor...", { id: "refresh" });
 
     try {
-      await refreshUserData();
+      const updatedUser = await refreshUserData();
       toast.success("Bilgiler güncellendi", { id: "refresh" });
 
+      console.log("Güncel kullanıcı rolü:", updatedUser?.role);
+
       // Kullanıcının yetkisi değiştiyse uygun sayfaya yönlendir
-      if (userRole !== "admin" && pathname.startsWith("/admin")) {
-        toast.error("Admin yetkiniz kaldırıldı");
-        router.push("/");
+      if (userRole !== updatedUser?.role) {
+        toast.success(`Rolünüz güncellendi: ${updatedUser?.role}`);
+
+        // Rol organizatör olarak güncellendiyse organizatör paneline yönlendir
+        if (updatedUser?.role === "organizer" && userRole !== "organizer") {
+          router.push("/organizer");
+        }
       }
     } catch (error) {
       console.error("Bilgiler güncellenirken hata:", error);
@@ -111,8 +128,8 @@ export function Navbar() {
                   key={link.href}
                   href={link.href}
                   className={`inline-flex justify-center items-center px-3 lg:mr-1 pt-1 border-b-2 text-sm font-medium cursor-pointer ${pathname === link.href
-                      ? "border-primary text-primary"
-                      : "border-transparent text-foreground hover:border-border hover:text-primary"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-foreground hover:border-border hover:text-primary"
                     }`}
                 >
                   {link.label}
@@ -127,6 +144,18 @@ export function Navbar() {
 
             {isAuthenticated && user ? (
               <div className="flex items-center space-x-4">
+                {/* Yenileme butonu ekle */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRefreshUserData}
+                  disabled={isRefreshing}
+                  className="flex flex-col items-center"
+                >
+                  <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="text-xs mt-1">Yenile</span>
+                </Button>
+
                 {activeLinks.map((link) => (
                   <Link key={link.href} href={link.href}>
                     <Button

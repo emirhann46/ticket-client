@@ -7,12 +7,10 @@ import axios from "axios";
 
 // Kategori tipi
 interface Category {
-  id: number;
-  attributes: {
-    isim: string;
-    aciklama: string;
-    slug: string;
-  };
+  _id: string;
+  name: string;
+  description: string;
+  image: string;
 }
 
 export default function Home() {
@@ -124,14 +122,16 @@ export default function Home() {
               </div>
             ) : categories.length > 0 ? (
               categories.map((category) => {
-                const id = category.id;
-                const { isim, slug } = category.attributes;
-                const Icon = getCategoryIcon(isim);
+                const id = category._id;
+                const name = category.name;
+                // Slug oluşturmak için kategori adını küçük harfe çevirip boşlukları tire ile değiştiriyoruz
+                const slug = name.toLowerCase().replace(/\s+/g, '-');
+                const Icon = getCategoryIcon(name);
                 return (
                   <Link key={id} href={`/events/category/${slug}`}>
                     <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer">
                       <Icon className="h-12 w-12 text-primary mb-4" />
-                      <h3 className="text-lg font-semibold text-foreground">{isim}</h3>
+                      <h3 className="text-lg font-semibold text-foreground">{name}</h3>
                     </div>
                   </Link>
                 );
