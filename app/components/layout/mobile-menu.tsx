@@ -5,13 +5,14 @@ import { ThemeSwitcher } from "@/app/components/theme/theme-switcher";
 interface MobileMenuProps {
   isOpen: boolean;
   navLinks: { href: string; label: string; icon: React.ElementType }[];
-  activeLinks: { href: string; label: string; icon: React.ElementType }[];
+  activeLinks: { href: string; label: string; icon: React.ElementType; showCount?: boolean }[];
   isAuthenticated: boolean;
   user: any;
   pathname: string;
   handleLogout: () => void;
   handleRefreshUserData: () => void;
   isRefreshing: boolean;
+  cartItemCount: number;
 }
 
 export default function MobileMenu({
@@ -23,7 +24,8 @@ export default function MobileMenu({
   pathname,
   handleLogout,
   handleRefreshUserData,
-  isRefreshing
+  isRefreshing,
+  cartItemCount
 }: MobileMenuProps) {
   if (!isOpen) return null;
 
@@ -40,8 +42,8 @@ export default function MobileMenu({
                   key={link.href}
                   href={link.href}
                   className={`block py-3 px-4 rounded-md text-base font-medium transition-all duration-200 ease-in-out ${pathname === link.href
-                      ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
-                      : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
+                    ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
+                    : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
                     }`}
                 >
                   {link.label}
@@ -75,11 +77,18 @@ export default function MobileMenu({
                     key={link.href}
                     href={link.href}
                     className={`flex items-center py-3 px-4 rounded-md text-base font-medium transition-all duration-200 ease-in-out ${pathname === link.href
-                        ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
-                        : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
+                      ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
+                      : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
                       }`}
                   >
-                    <link.icon className="mr-3 h-5 w-5" />
+                    <div className="relative">
+                      <link.icon className="mr-3 h-5 w-5" />
+                      {link.showCount && cartItemCount > 0 && (
+                        <span className="absolute -top-2 -right-1 h-4 w-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                          {cartItemCount}
+                        </span>
+                      )}
+                    </div>
                     {link.label}
                   </Link>
                 ))}

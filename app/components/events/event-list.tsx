@@ -16,7 +16,7 @@ interface Event {
   location: string;
   date: string;
   price: number;
-  image: string;
+  coverImage: string;
   category: {
     _id: string;
     name: string;
@@ -132,7 +132,7 @@ export function EventList() {
               <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{
-                  backgroundImage: `url(${event.image || defaultImageUrl})`
+                  backgroundImage: `url(${event.coverImage || defaultImageUrl})`
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

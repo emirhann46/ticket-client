@@ -9,6 +9,19 @@ import { useEffect, useState } from "react";
 import useAuthStore from "@/app/hooks/useAuth";
 import { toast } from "react-hot-toast";
 import MobileMenu from "./mobile-menu";
+import useCart from "@/app/hooks/useCart";
+
+// Ana menü linkleri için interface
+interface NavLink {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+}
+
+// Rol bazlı linkler için interface (sepet sayacı gösterimi için showCount içerir)
+interface ActiveLink extends NavLink {
+  showCount?: boolean;
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -17,6 +30,7 @@ export function Navbar() {
   const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
   const [isClient, setIsClient] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const cartItemCount = useCart((state) => state.getItemCount());
 
   // SSR/CSR uyumsuzluğunu önle
   useEffect(() => {
@@ -27,20 +41,29 @@ export function Navbar() {
   const userRole = user?.role || user?.role;
 
   // Ana menü linkleri
-  const navLinks = [
+  const navLinks: NavLink[] = [
     { href: "/", label: "Ana Sayfa", icon: Home },
     { href: "/events", label: "Etkinlikler", icon: CalendarDays },
   ];
 
   // Rol bazlı linkler
   const getRoleBasedLinks = () => {
-    if (!user) return [];
+    if (!user) {
+      // Kullanıcı giriş yapmamışsa sadece sepet göster
+      return [
+        { href: "/cart", label: "Sepetim", icon: ShoppingCart, showCount: true }
+      ] as ActiveLink[];
+    }
 
-    const links = [
+    const links: ActiveLink[] = [
       { href: "/profile", label: "Profil", icon: User },
-      { href: "/tickets", label: "Biletlerim", icon: Ticket },
-      { href: "/cart", label: "Sepet", icon: ShoppingCart },
     ];
+
+    // Admin olmayan kullanıcılar için sepet ve biletlerim
+    if (userRole !== "admin") {
+      links.push({ href: "/tickets", label: "Biletlerim", icon: Ticket });
+      links.push({ href: "/cart", label: "Sepetim", icon: ShoppingCart, showCount: true });
+    }
 
     if (userRole === "admin") {
       links.push({ href: "/admin", label: "Admin Panel", icon: Users });
@@ -111,8 +134,8 @@ export function Navbar() {
                   key={link.href}
                   href={link.href}
                   className={`inline-flex justify-center items-center px-3 lg:mr-1 pt-1 border-b-2 text-sm font-medium cursor-pointer ${pathname === link.href
-                      ? "border-primary text-primary"
-                      : "border-transparent text-foreground hover:border-border hover:text-primary"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-foreground hover:border-border hover:text-primary"
                     }`}
                 >
                   {link.label}
@@ -132,10 +155,15 @@ export function Navbar() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`flex w-18 flex-col p-4 cursor-pointer ${pathname === link.href ? "bg-accent" : ""
+                      className={`relative flex w-18 flex-col p-4 cursor-pointer ${pathname === link.href ? "bg-accent" : ""
                         }`}
                     >
                       <link.icon className="h-5 w-5" />
+                      {link.showCount && cartItemCount > 0 && (
+                        <span className="absolute top-1 right-1 h-5 w-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                          {cartItemCount}
+                        </span>
+                      )}
                       <span className="text-xs mt-1 mb-1">{link.label}</span>
                     </Button>
                   </Link>
@@ -152,7 +180,26 @@ export function Navbar() {
                 </Button>
               </div>
             ) : (
-              <div className="flex space-x-2">
+              <div className="flex space-x-2 items-center">
+                {/* Giriş yapmamış kullanıcılar için sepet */}
+                {activeLinks.map((link) => (
+                  <Link key={link.href} href={link.href}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative flex flex-col p-4 cursor-pointer"
+                    >
+                      <link.icon className="h-5 w-5" />
+                      {link.showCount && cartItemCount > 0 && (
+                        <span className="absolute top-1 right-1 h-5 w-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                          {cartItemCount}
+                        </span>
+                      )}
+                      <span className="text-xs mt-1 mb-1">{link.label}</span>
+                    </Button>
+                  </Link>
+                ))}
+
                 <Link href="/auth/login">
                   <Button variant="ghost">Giriş Yap</Button>
                 </Link>
@@ -165,6 +212,18 @@ export function Navbar() {
 
           {/* Mobil Menü Butonu */}
           <div className="flex items-center sm:hidden">
+            {/* Mobil sepet ikonu */}
+            {userRole !== "admin" && (
+              <Link href="/cart" className="relative p-1 mr-2">
+                <ShoppingCart className="h-6 w-6 text-muted-foreground" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 h-5 w-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                    {cartItemCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
             <Button
               variant="ghost"
               size="icon"
@@ -181,7 +240,7 @@ export function Navbar() {
         </div>
       </div >
 
-      {/* Mobil Menü */}
+      {/* Mobil Menü - MobileMenu bileşenine sepet sayacı için cartItemCount iletilmeli */}
       <MobileMenu
         isOpen={mobileMenuOpen}
         navLinks={navLinks}
@@ -192,6 +251,7 @@ export function Navbar() {
         handleLogout={handleLogout}
         handleRefreshUserData={handleRefreshUserData}
         isRefreshing={isRefreshing}
+        cartItemCount={cartItemCount}
       />
     </nav >
   );

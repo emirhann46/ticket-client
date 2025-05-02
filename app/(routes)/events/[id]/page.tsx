@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 import useAuthStore from "@/app/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { formatPrice } from "@/lib/utils";
+import useCart from "@/app/hooks/useCart";
 
 interface EventPageProps {
   params: {
@@ -23,7 +26,8 @@ interface Event {
   location: string;
   date: string;
   price: number;
-  image: string;
+  coverImage: string;
+  sliderImages: string[];
   category: {
     _id: string;
     name: string;
@@ -36,13 +40,14 @@ interface Event {
   availableTickets: number;
 }
 
-export default function EventPage({ params }: EventPageProps) {
-  const eventId = params.id;
+export default function EventPage({ params }: { params: Promise<EventPageProps["params"]> }) {
+  const { id: eventId } = use(params);
   const [isLiked, setIsLiked] = useState(false);
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [similarEvents, setSimilarEvents] = useState([]);
-  const { isAuthenticated, getJwt } = useAuthStore();
+  const { isAuthenticated, user, getJwt } = useAuthStore();
+  const { addItem, items } = useCart();
   const router = useRouter();
 
   useEffect(() => {
@@ -99,27 +104,46 @@ export default function EventPage({ params }: EventPageProps) {
     }
   };
 
-  const handleBuyTicket = async (price: number) => {
+  // Sepete ekle
+  const handleAddToCart = () => {
+    if (!event) return;
     if (!isAuthenticated) {
       toast.error("Bilet almak için giriş yapmalısınız");
       router.push('/auth/login');
       return;
     }
 
-    try {
-      const token = getJwt();
-
-      await axios.post('http://localhost:5000/api/tickets',
-        { eventId: eventId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success("Bilet sepete eklendi!");
-      router.push('/cart');
-    } catch (error: any) {
-      console.error("Bilet eklenirken hata:", error);
-      toast.error(error.response?.data?.message || "Bilet eklenemedi");
+    // Admin kullanıcıları sepete ekleme yapamaz
+    if (user?.role === 'admin') {
+      toast.error("Admin kullanıcılar sepete ürün ekleyemez");
+      return;
     }
+
+    // Ürün zaten sepette mi kontrol et
+    const isInCart = items.some(item => item.event._id === event._id);
+    if (isInCart) {
+      toast.error("Bu etkinlik zaten sepetinizde");
+      return;
+    }
+
+    addItem({
+      _id: event._id,
+      event: {
+        _id: event._id,
+        title: event.title,
+        image: event.coverImage,
+        date: event.date,
+        price: event.price,
+      },
+      quantity: 1,
+    });
+
+    toast.success("Etkinlik sepete eklendi!");
+  };
+
+  const handleBuyTicket = async () => {
+    handleAddToCart();
+    router.push('/cart');
   };
 
   // Tarih formatlayıcı fonksiyon
@@ -132,9 +156,6 @@ export default function EventPage({ params }: EventPageProps) {
       year: "numeric",
     });
   };
-
-  // Sabit bir varsayılan resim URL'i
-  const defaultImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80";
 
   if (loading) {
     return (
@@ -171,6 +192,9 @@ export default function EventPage({ params }: EventPageProps) {
     );
   }
 
+  // Ürünün sepette olup olmadığını kontrol et
+  const isInCart = items.some(item => item.event._id === event._id);
+
   return (
     <div className="bg-background min-h-screen py-12">
       <div className="container mx-auto px-4">
@@ -179,7 +203,7 @@ export default function EventPage({ params }: EventPageProps) {
           <div className="lg:col-span-2">
             <div className="relative w-full h-[400px] rounded-lg overflow-hidden">
               <Image
-                src={event.image || defaultImageUrl}
+                src={event.coverImage}
                 alt={event.title}
                 fill
                 className="object-cover"
@@ -214,7 +238,7 @@ export default function EventPage({ params }: EventPageProps) {
               <div className="flex justify-between items-center mb-4">
                 <div className="text-foreground">
                   <span className="text-sm">Bilet Fiyatı</span>
-                  <p className="text-xl font-bold">{event.price}₺</p>
+                  <p className="text-xl font-bold">{formatPrice(event.price)}</p>
                 </div>
                 <div className="flex space-x-2">
                   <Button
@@ -236,10 +260,14 @@ export default function EventPage({ params }: EventPageProps) {
               </div>
               <Button
                 className="w-full"
-                onClick={() => handleBuyTicket(event.price)}
-                disabled={event.availableTickets <= 0}
+                onClick={handleBuyTicket}
+                disabled={event.availableTickets <= 0 || user?.role === "admin" || isInCart}
               >
-                {event.availableTickets > 0 ? "Bilet Al" : "Biletler Tükendi"}
+                {event.availableTickets <= 0
+                  ? "Biletler Tükendi"
+                  : isInCart
+                    ? "Sepete Eklendi"
+                    : "Bilet Al"}
               </Button>
             </div>
           </div>
@@ -271,7 +299,7 @@ export default function EventPage({ params }: EventPageProps) {
               <div className="p-4 border border-border rounded-lg">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="font-medium text-foreground">Standart Bilet</h3>
-                  <span className="font-bold text-foreground">{event.price}₺</span>
+                  <span className="font-bold text-foreground">{formatPrice(event.price)}</span>
                 </div>
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-muted-foreground">
@@ -280,10 +308,14 @@ export default function EventPage({ params }: EventPageProps) {
                 </div>
                 <Button
                   className="w-full"
-                  onClick={() => handleBuyTicket(event.price)}
-                  disabled={event.availableTickets <= 0}
+                  onClick={handleAddToCart}
+                  disabled={event.availableTickets <= 0 || user?.role === "admin" || isInCart}
                 >
-                  {event.availableTickets > 0 ? "Sepete Ekle" : "Biletler Tükendi"}
+                  {event.availableTickets <= 0
+                    ? "Biletler Tükendi"
+                    : isInCart
+                      ? "Sepete Eklendi"
+                      : "Sepete Ekle"}
                 </Button>
               </div>
             </div>
@@ -300,7 +332,7 @@ export default function EventPage({ params }: EventPageProps) {
                   <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                     <div className="relative w-full h-48">
                       <Image
-                        src={relatedEvent.image || defaultImageUrl}
+                        src={relatedEvent.coverImage}
                         alt={relatedEvent.title}
                         fill
                         className="object-cover"

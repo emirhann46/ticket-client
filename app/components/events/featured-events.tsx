@@ -1,111 +1,169 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Clock } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Calendar, MapPin } from "lucide-react";
+import axios from "axios";
+import Image from "next/image";
+import { formatPrice } from "@/lib/utils";
+import useCart from "@/app/hooks/useCart";
+import { toast } from "react-hot-toast";
+import useAuthStore from "@/app/hooks/useAuth";
+
+interface Event {
+  _id: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  price: number;
+  coverImage: string;
+  isApproved: boolean;
+  category: {
+    _id: string;
+    name: string;
+  };
+}
 
 export function FeaturedEvents() {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { addItem, items } = useCart();
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    const fetchFeaturedEvents = async () => {
+      try {
+        // Onaylı etkinlikleri getir ve en son eklenenlerden 4 tanesini göster
+        const response = await axios.get('http://localhost:5000/api/events?isApproved=true&limit=4');
+        if (response.data && response.data.data) {
+          setEvents(response.data.data);
+        }
+      } catch (error) {
+        console.error("Etkinlikler yüklenirken hata oluştu:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFeaturedEvents();
+  }, []);
+
+  const handleAddToCart = (event: Event) => {
+    // Admin rolü kontrolü
+    if (user?.role === "admin") {
+      toast.error("Admin kullanıcılar sepete ürün ekleyemez");
+      return;
+    }
+
+    // Ürün zaten sepette mi kontrol et
+    if (items.some(item => item.event._id === event._id)) {
+      toast.error("Bu etkinlik zaten sepetinizde");
+      return;
+    }
+
+    addItem({
+      _id: event._id,
+      event: {
+        _id: event._id,
+        title: event.title,
+        image: event.coverImage,
+        date: event.date,
+        price: event.price,
+      },
+      quantity: 1,
+    });
+
+    toast.success("Etkinlik sepete eklendi");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, index) => (
+          <div key={index} className="h-80 rounded-lg bg-muted animate-pulse"></div>
+        ))}
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="text-center py-10">
+        <p className="text-lg text-muted-foreground">Şu anda öne çıkan etkinlik bulunmamaktadır.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      {featuredEvents.map((event) => (
-        <div
-          key={event.id}
-          className="flex flex-col rounded-lg overflow-hidden border border-border bg-card transition-all duration-200 hover:border-primary hover:shadow-md"
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+      {events.map((event) => (
+        <Card
+          key={event._id}
+          className="flex flex-col overflow-hidden group hover:shadow-lg transition-shadow min-w-0"
         >
-          <div className="relative h-48 bg-muted">
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${event.image})` }}
+          <div className="relative h-48 w-full">
+            <Image
+              src={event.coverImage}
+              alt={event.title}
+              fill
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-            <div className="absolute bottom-0 left-0 p-4">
+            <div className="absolute bottom-0 left-0 p-4 w-full">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground">
-                {event.category}
+                {event.category?.name || "Etkinlik"}
               </span>
             </div>
           </div>
-          <div className="flex-1 p-6 flex flex-col">
-            <h3 className="text-lg font-medium text-foreground">{event.title}</h3>
-            <div className="mt-2 text-sm text-muted-foreground line-clamp-2">
+
+          <div className="flex-1 p-4">
+            <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+              {event.title}
+            </h3>
+            <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
               {event.description}
-            </div>
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+            </p>
+
+            <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center">
                 <Calendar className="mr-2 h-4 w-4" />
-                {new Date(event.date).toLocaleDateString("tr-TR", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </div>
-              <div className="flex items-center">
-                <Clock className="mr-2 h-4 w-4" />
-                {event.time}
+                <span>
+                  {new Date(event.date).toLocaleDateString("tr-TR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
               </div>
               <div className="flex items-center">
                 <MapPin className="mr-2 h-4 w-4" />
-                {event.location}
+                <span>{event.location}</span>
               </div>
             </div>
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-lg font-semibold text-foreground">
-                {event.price} ₺
-              </div>
-              <Link href={`/events/${event.id}`}>
-                <Button size="sm">Bilet Al</Button>
+          </div>
+
+          <div className="p-4 pt-0 mt-auto flex items-center justify-between">
+            <div className="text-lg font-semibold">{formatPrice(event.price)}</div>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddToCart(event)}
+                disabled={user?.role === "admin" || items.some(item => item.event._id === event._id)}
+              >
+                {items.some(item => item.event._id === event._id) ? "Sepette" : "Sepete Ekle"}
+              </Button>
+              <Link href={`/events/${event._id}`}>
+                <Button size="sm">Detaylar</Button>
               </Link>
             </div>
           </div>
-        </div>
+        </Card>
       ))}
     </div>
+
   );
 }
-
-// Dummy data for featured events
-const featuredEvents = [
-  {
-    id: "1",
-    title: "Duman Konseri",
-    description: "Duman grubu ile unutulmaz bir gece yaşayın. En sevilen şarkılar ve daha fazlası.",
-    date: "2025-03-15",
-    time: "20:00",
-    location: "Volkswagen Arena, İstanbul",
-    price: 350,
-    category: "Konser",
-    image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80",
-  },
-  {
-    id: "2",
-    title: "Fenerbahçe vs Galatasaray",
-    description: "Süper Lig'in en küçük derbisi. Bu heyecanı kaçırmayın!",
-    date: "2025-04-02",
-    time: "19:00",
-    location: "Ülker Stadyumu, İstanbul",
-    price: 500,
-    category: "Spor",
-    image: "https://images.unsplash.com/photo-1508098682722-e99c643e7f0b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80",
-  },
-  {
-    id: "3",
-    title: "Hamlet",
-    description: "Shakespeare'in ölümsüz eseri, usta oyuncularla sahnede.",
-    date: "2025-03-20",
-    time: "20:30",
-    location: "Harbiye Muhsin Ertuğrul Sahnesi, İstanbul",
-    price: 200,
-    category: "Tiyatro",
-    image: "https://images.unsplash.com/photo-1503095396549-807759245b35?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1171&q=80",
-  },
-  {
-    id: "4",
-    title: "İstanbul Coffee Festival",
-    description: "Kahve tutkunları için en büyük festival. Tadımlar, workshoplar ve daha fazlası.",
-    date: "2025-05-10",
-    time: "10:00 - 20:00",
-    location: "KüçükÇiftlik Park, İstanbul",
-    price: 150,
-    category: "Festival",
-    image: "https://images.unsplash.com/photo-1511081692775-05d0f180a065?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1171&q=80",
-  },
-]; 
