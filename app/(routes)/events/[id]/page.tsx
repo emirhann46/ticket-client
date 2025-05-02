@@ -1,322 +1,339 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Share2, Heart, Users } from "lucide-react";
-import axios from "axios";
-import { toast } from "react-hot-toast";
+import { 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  Users, 
+  ShoppingCart,
+  Info,
+  Tag,
+  ArrowLeft,
+  Share2 
+} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import useCartStore from "@/app/hooks/useCart";
 import useAuthStore from "@/app/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import axios from "axios";
 
-interface EventPageProps {
-  params: {
-    id: string;
-  };
+// Bilet türü arayüzü
+interface TicketType {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  availableCount: number;
+  maxPerPurchase: number;
 }
 
+// Etkinlik arayüzü
 interface Event {
-  _id: string;
+  id: string;
   title: string;
   description: string;
-  location: string;
-  date: string;
-  price: number;
+  longDescription: string;
   image: string;
-  category: {
-    _id: string;
-    name: string;
-  };
-  organizerId: {
-    _id: string;
-    username: string;
-    email: string;
-  };
-  availableTickets: number;
+  date: string;
+  time: string;
+  location: string;
+  address: string;
+  organizer: string;
+  organizerId: string;
+  category: string;
+  tags: string[];
+  ticketTypes: TicketType[];
 }
 
-export default function EventPage({ params }: EventPageProps) {
-  const eventId = params.id;
-  const [isLiked, setIsLiked] = useState(false);
-  const [event, setEvent] = useState<Event | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [similarEvents, setSimilarEvents] = useState([]);
-  const { isAuthenticated, getJwt } = useAuthStore();
+export default function EventDetailPage() {
+  const params = useParams();
   const router = useRouter();
-
-  useEffect(() => {
-    const fetchEventDetails = async () => {
-      try {
-        const response = await axios.get(`http://localhost:5000/api/events/${eventId}`);
-
-        if (response.data && response.data.data) {
-          setEvent(response.data.data);
-        }
-      } catch (error) {
-        console.error("Etkinlik detayları yüklenirken hata:", error);
-        toast.error("Etkinlik detayları yüklenemedi");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchSimilarEvents = async () => {
-      try {
-        // Benzer etkinlikleri getir (aynı kategorideki diğer etkinlikler olabilir)
-        const response = await axios.get(`http://localhost:5000/api/events?limit=3`);
-
-        if (response.data && response.data.data) {
-          setSimilarEvents(response.data.data.filter((e: any) => e._id !== eventId).slice(0, 3));
-        }
-      } catch (error) {
-        console.error("Benzer etkinlikler yüklenirken hata:", error);
-      }
-    };
-
-    fetchEventDetails();
-    fetchSimilarEvents();
-  }, [eventId]);
-
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    // Bu işlevsellik sonraki aşamalarda implement edilebilir
-    toast.success(isLiked ? "Etkinlik favorilerden çıkarıldı" : "Etkinlik favorilere eklendi");
-  };
-
-  const handleShare = () => {
-    // Paylaşım fonksiyonu
-    if (navigator.share) {
-      navigator.share({
-        title: event?.title || 'Etkinlik',
-        text: event?.description || '',
-        url: window.location.href,
-      })
-        .catch(err => console.error('Paylaşım hatası:', err));
-    } else {
-      toast.success("Etkinlik bağlantısı panoya kopyalandı!");
-      navigator.clipboard.writeText(window.location.href);
-    }
-  };
-
-  const handleBuyTicket = async (price: number) => {
+  const eventId = params.id as string;
+  const { addItem, isInCart } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
+  
+  const [event, setEvent] = useState<Event | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Sepete ekle butonuna tıklanınca tetiklenir
+  const handleAddToCart = (ticketType: TicketType) => {
     if (!isAuthenticated) {
-      toast.error("Bilet almak için giriş yapmalısınız");
-      router.push('/auth/login');
+      toast.error("Bilet satın almak için giriş yapmalısınız");
+      router.push("/auth/login");
       return;
     }
-
-    try {
-      const token = getJwt();
-
-      await axios.post('http://localhost:5000/api/tickets',
-        { eventId: eventId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success("Bilet sepete eklendi!");
-      router.push('/cart');
-    } catch (error: any) {
-      console.error("Bilet eklenirken hata:", error);
-      toast.error(error.response?.data?.message || "Bilet eklenemedi");
+    
+    // Her zaman 1 adet bilet ekle
+    const quantity = 1;
+    
+    // Seçilen bilet sepete ekleniyor
+    const cartItem = {
+      id: `${eventId}-${ticketType.id}`,
+      eventId: eventId,
+      eventTitle: event?.title || "",
+      eventImage: event?.image || "",
+      eventDate: event?.date || "",
+      eventTime: event?.time || "", 
+      eventLocation: event?.location || "",
+      ticketType: ticketType.name,
+      price: ticketType.price,
+      quantity: quantity
+    };
+    
+    addItem(cartItem);
+    toast.success(`${ticketType.name} bileti sepete eklendi`);
+    
+    // Kullanıcıyı doğrudan sepet sayfasına yönlendir
+    router.push("/cart");
+  };
+  
+  // Etkinlik verilerini çek
+  useEffect(() => {
+    const fetchEvent = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Gerçek API çağrısı
+        const response = await axios.get(`http://localhost:3001/api/events/${eventId}`);
+        setEvent(response.data.data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Etkinlik bilgileri alınırken hata oluştu:", error);
+        toast.error("Etkinlik bilgileri yüklenirken bir sorun oluştu");
+        
+        // Hata durumunda yerine mock veri gösterilir (gerçek uygulamada bu kaldırılmalı)
+        setTimeout(() => {
+          setEvent({
+            id: eventId,
+            title: "Tech Summit 2025",
+            description: "Teknoloji dünyasının önde gelen isimleriyle buluşma fırsatı",
+            longDescription: "Tech Summit 2025, teknoloji dünyasının önde gelen isimlerini bir araya getiriyor. Yapay zeka, blockchain, siber güvenlik ve daha birçok alanda uzmanlarla tanışma ve networking fırsatı yakalayın. Gün boyu sürecek oturumlar, workshop'lar ve demo alanlarıyla dolu dolu bir etkinlik sizleri bekliyor.\n\nKatılımcılara özel sürpriz hediyeler ve kariyer fırsatları için yerinizi hemen ayırtın!",
+            image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1112&q=80",
+            date: "10 Nisan 2025",
+            time: "09:00 - 18:00",
+            location: "İstanbul Kongre Merkezi",
+            address: "Harbiye, 34267 Şişli/İstanbul",
+            organizer: "TechEvents Türkiye",
+            organizerId: "org123",
+            category: "Konferans",
+            tags: ["Teknoloji", "Yapay Zeka", "Blockchain", "Networking"],
+            ticketTypes: [
+              {
+                id: "standard",
+                name: "Standart Bilet",
+                price: 250,
+                description: "Tüm oturumlara erişim, öğle yemeği dahil",
+                availableCount: 150,
+                maxPerPurchase: 5
+              },
+              {
+                id: "vip",
+                name: "VIP Bilet",
+                price: 500,
+                description: "Standart bilet + özel networking etkinliği ve konuşmacılarla tanışma fırsatı",
+                availableCount: 50,
+                maxPerPurchase: 2
+              },
+              {
+                id: "workshop",
+                name: "Workshop Paketi",
+                price: 350,
+                description: "Standart bilet + öğleden sonra workshop katılımı",
+                availableCount: 75,
+                maxPerPurchase: 3
+              }
+            ]
+          });
+          setIsLoading(false);
+        }, 1000);
+      }
+    };
+    
+    if (eventId) {
+      fetchEvent();
     }
-  };
-
-  // Tarih formatlayıcı fonksiyon
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  // Sabit bir varsayılan resim URL'i
-  const defaultImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80";
-
-  if (loading) {
+  }, [eventId]);
+  
+  // Yükleme durumu
+  if (isLoading) {
     return (
       <div className="bg-background min-h-screen py-12">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-            <div className="lg:col-span-2">
-              <div className="relative w-full h-[400px] rounded-lg overflow-hidden bg-muted animate-pulse"></div>
-            </div>
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm flex flex-col animate-pulse">
-              <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
-              <div className="h-6 bg-muted rounded w-1/2 mb-3"></div>
-              <div className="h-6 bg-muted rounded w-2/3 mb-3"></div>
-              <div className="h-6 bg-muted rounded w-3/4 mb-3"></div>
-              <div className="mt-auto">
-                <div className="h-10 bg-muted rounded w-full"></div>
-              </div>
-            </div>
+          <div className="flex justify-center pt-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         </div>
       </div>
     );
   }
-
+  
+  // Etkinlik bulunamadı
   if (!event) {
     return (
       <div className="bg-background min-h-screen py-12">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-2xl font-bold mb-4">Etkinlik bulunamadı</h1>
-          <p className="mb-6">Bu etkinlik artık mevcut değil veya kaldırılmış olabilir.</p>
-          <Button asChild><Link href="/events">Tüm Etkinlikler</Link></Button>
+          <h1 className="text-3xl font-bold mb-4">Etkinlik Bulunamadı</h1>
+          <p className="text-muted-foreground mb-8">İstediğiniz etkinlik bulunamadı veya kaldırılmış olabilir.</p>
+          <Button onClick={() => router.push("/events")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Etkinliklere Dön
+          </Button>
         </div>
       </div>
     );
   }
-
+  
   return (
     <div className="bg-background min-h-screen py-12">
       <div className="container mx-auto px-4">
-        {/* Etkinlik Başlık ve Resim */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <Button 
+          variant="ghost" 
+          className="mb-6"
+          onClick={() => router.push("/events")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Etkinliklere Dön
+        </Button>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Sol Kolon - Etkinlik Detayları */}
           <div className="lg:col-span-2">
-            <div className="relative w-full h-[400px] rounded-lg overflow-hidden">
+            <div className="relative w-full h-[300px] md:h-[400px] rounded-lg overflow-hidden mb-6">
               <Image
-                src={event.image || defaultImageUrl}
+                src={event.image}
                 alt={event.title}
                 fill
                 className="object-cover"
               />
             </div>
-          </div>
-          <div className="bg-card p-6 rounded-lg border border-border shadow-sm flex flex-col">
-            <h1 className="text-2xl font-bold mb-4 text-foreground">{event.title}</h1>
-
-            <div className="flex items-center mb-3 text-muted-foreground">
-              <Calendar className="h-5 w-5 mr-2" />
-              <span>{formatDate(event.date)}</span>
+            
+            <h1 className="text-3xl font-bold mb-4 text-foreground">{event.title}</h1>
+            
+            <div className="flex flex-wrap gap-2 mb-6">
+              <Badge variant="outline" className="bg-primary/10">
+                {event.category}
+              </Badge>
+              {event.tags && event.tags.map((tag, index) => (
+                <Badge key={index} variant="outline">
+                  {tag}
+                </Badge>
+              ))}
             </div>
-
-            <div className="flex items-center mb-3 text-muted-foreground">
-              <MapPin className="h-5 w-5 mr-2" />
-              <span>{event.location}</span>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-start">
+                    <Calendar className="h-5 w-5 mr-3 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Tarih</p>
+                      <p className="text-muted-foreground">{event.date}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-start">
+                    <Clock className="h-5 w-5 mr-3 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Saat</p>
+                      <p className="text-muted-foreground">{event.time}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="md:col-span-2">
+                <CardContent className="p-4">
+                  <div className="flex items-start">
+                    <MapPin className="h-5 w-5 mr-3 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Konum</p>
+                      <p className="text-muted-foreground">{event.location}</p>
+                      <p className="text-sm text-muted-foreground">{event.address}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-
-            <div className="flex items-center mb-3 text-muted-foreground">
-              <Users className="h-5 w-5 mr-2" />
-              <span>Organizatör: {event.organizerId?.username || "Bilinmiyor"}</span>
-            </div>
-
-            <div className="mt-2 mb-6">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                {event.category?.name || "Genel"}
-              </span>
-            </div>
-
-            <div className="mt-auto">
-              <div className="flex justify-between items-center mb-4">
-                <div className="text-foreground">
-                  <span className="text-sm">Bilet Fiyatı</span>
-                  <p className="text-xl font-bold">{event.price}₺</p>
+            
+            <Tabs defaultValue="description" className="mb-10">
+              <TabsList className="mb-4">
+                <TabsTrigger value="description">Açıklama</TabsTrigger>
+                <TabsTrigger value="details">Detaylar</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="description" className="prose dark:prose-invert max-w-none">
+                <p>{event.longDescription || event.description}</p>
+              </TabsContent>
+              
+              <TabsContent value="details">
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <Info className="h-5 w-5 mr-3 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Organizatör</p>
+                      <p className="text-muted-foreground">{event.organizer}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start">
+                    <Tag className="h-5 w-5 mr-3 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Kategori</p>
+                      <p className="text-muted-foreground">{event.category}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          {/* Sağ Kolon - Bilet Satın Alma */}
+          <div>
+            <div className="bg-card p-6 rounded-lg border border-border shadow-sm sticky top-24">
+              <h2 className="text-xl font-bold mb-6 text-foreground">Bilet</h2>
+              
+              <div className="border border-border rounded-lg p-4 transition-all hover:border-primary">
+                <div className="flex justify-between mb-4">
+                  <h3 className="font-medium">Standart Bilet</h3>
+                  <p className="font-bold">{event.price}₺</p>
+                </div>
+                
+                <div className="flex justify-end items-center">
                   <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleLike}
-                    className={isLiked ? "text-red-500" : ""}
+                    onClick={() => handleAddToCart({
+                      id: "standard",
+                      name: "Standart Bilet",
+                      price: event.price,
+                      description: "",
+                      availableCount: event.availableTickets || 100,
+                      maxPerPurchase: 5
+                    })}
+                    disabled={isInCart(eventId)}
                   >
-                    <Heart className="h-5 w-5" fill={isLiked ? "currentColor" : "none"} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleShare}
-                  >
-                    <Share2 className="h-5 w-5" />
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    {isInCart(eventId) ? "Sepette" : "Sepete Ekle"}
                   </Button>
                 </div>
               </div>
-              <Button
-                className="w-full"
-                onClick={() => handleBuyTicket(event.price)}
-                disabled={event.availableTickets <= 0}
-              >
-                {event.availableTickets > 0 ? "Bilet Al" : "Biletler Tükendi"}
+              
+              <Button className="w-full mt-6" onClick={() => router.push("/cart")}>
+                Sepete Git
               </Button>
             </div>
           </div>
+          
         </div>
-
-        {/* Etkinlik Detayları ve Bilet Seçenekleri */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          <div className="lg:col-span-2">
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm mb-8">
-              <h2 className="text-xl font-bold mb-4 text-foreground">Etkinlik Detayları</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{event.description}</p>
-            </div>
-
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
-              <h2 className="text-xl font-bold mb-4 text-foreground">Konum</h2>
-              <div className="relative w-full h-[300px] rounded-lg overflow-hidden bg-muted">
-                {/* Burada gerçek bir harita komponenti olacak */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-muted-foreground">Harita yükleniyor...</p>
-                </div>
-              </div>
-              <p className="mt-4 text-muted-foreground">{event.location}</p>
-            </div>
-          </div>
-
-          <div>
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm sticky top-24">
-              <h2 className="text-xl font-bold mb-4 text-foreground">Bilet Bilgisi</h2>
-              <div className="p-4 border border-border rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium text-foreground">Standart Bilet</h3>
-                  <span className="font-bold text-foreground">{event.price}₺</span>
-                </div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm text-muted-foreground">
-                    {event.availableTickets} adet kaldı
-                  </span>
-                </div>
-                <Button
-                  className="w-full"
-                  onClick={() => handleBuyTicket(event.price)}
-                  disabled={event.availableTickets <= 0}
-                >
-                  {event.availableTickets > 0 ? "Sepete Ekle" : "Biletler Tükendi"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Benzer Etkinlikler */}
-        {similarEvents.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6 text-foreground">Benzer Etkinlikler</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {similarEvents.map((relatedEvent: any) => (
-                <Link href={`/events/${relatedEvent._id}`} key={relatedEvent._id}>
-                  <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div className="relative w-full h-48">
-                      <Image
-                        src={relatedEvent.image || defaultImageUrl}
-                        alt={relatedEvent.title}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-foreground">{relatedEvent.title}</h3>
-                      <p className="text-sm text-muted-foreground">{formatDate(relatedEvent.date)}</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
-  );
+  )
 }

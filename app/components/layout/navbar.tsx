@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { UserCircle, ShoppingCart, Ticket, Gift, LogOut, User, Inbox, CalendarDays, Users, Building, PlusCircle, RefreshCw, Menu, X, Home } from "lucide-react";
 import { useEffect, useState } from "react";
 import useAuthStore from "@/app/hooks/useAuth";
+import useCartStore from "@/app/hooks/useCart";
 import { toast } from "react-hot-toast";
 import MobileMenu from "./mobile-menu";
+import { Badge } from "@/components/ui/badge";
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
+  const { items, getItemsCount } = useCartStore();
   const [isClient, setIsClient] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -60,9 +63,7 @@ export function Navbar() {
 
     if (!["admin", "organizer"].includes(userRole)) {
       links.push({ href: "/organizer-application", label: "Organizatör Ol", icon: PlusCircle });
-      links.push(
-        { href: "/tickets", label: "Biletlerim", icon: Ticket },
-        { href: "/cart", label: "Sepet", icon: ShoppingCart },);
+      links.push({ href: "/tickets", label: "Biletlerim", icon: Ticket });
     }
 
     return links;
@@ -142,6 +143,27 @@ export function Navbar() {
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
             <ThemeSwitcher />
 
+            {/* Sepet İkonu - Admin rolünde olmayanlara göster */}
+            {isClient && isAuthenticated && user && user.role === "admin" ? null : (
+              <Link href="/cart">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="flex w-18 flex-col p-4 cursor-pointer relative"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  {items.length > 0 && (
+                    <Badge 
+                      className="absolute top-[1px] right-1 px-1 min-w-[1.1rem] h-[1.1rem] flex items-center justify-center bg-primary text-xs rounded-full"
+                    >
+                      {items.length}
+                    </Badge>
+                  )}
+                  <span className="text-xs mt-1 mb-1">Sepetim</span>
+                </Button>
+              </Link>
+            )}
+
             {isAuthenticated && user ? (
               <div className="flex items-center space-x-4">
                 {/* Yenileme butonu ekle */}
@@ -213,6 +235,7 @@ export function Navbar() {
       {/* Mobil Menü */}
       <MobileMenu
         isOpen={mobileMenuOpen}
+        setIsOpen={setMobileMenuOpen}
         navLinks={navLinks}
         activeLinks={activeLinks}
         isAuthenticated={isAuthenticated}

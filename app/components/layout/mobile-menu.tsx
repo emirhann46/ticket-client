@@ -1,9 +1,12 @@
-import { LogOut, UserCircle, RefreshCw } from "lucide-react";
+import { LogOut, UserCircle, RefreshCw, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { ThemeSwitcher } from "@/app/components/theme/theme-switcher";
+import { Badge } from "@/components/ui/badge";
+import useCartStore from "@/app/hooks/useCart";
 
 interface MobileMenuProps {
   isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
   navLinks: { href: string; label: string; icon: React.ElementType }[];
   activeLinks: { href: string; label: string; icon: React.ElementType }[];
   isAuthenticated: boolean;
@@ -16,6 +19,7 @@ interface MobileMenuProps {
 
 export default function MobileMenu({
   isOpen,
+  setIsOpen,
   navLinks,
   activeLinks,
   isAuthenticated,
@@ -26,6 +30,9 @@ export default function MobileMenu({
   isRefreshing
 }: MobileMenuProps) {
   if (!isOpen) return null;
+  
+  // Sepet bilgilerini al
+  const { items } = useCartStore();
 
   return (
     <div className="fixed inset-0 z-10 sm:hidden">
@@ -83,6 +90,19 @@ export default function MobileMenu({
                     {link.label}
                   </Link>
                 ))}
+
+                {/* Sepeti sadece admin olmayan kullanıcılara göster */}
+                {isAuthenticated && user && user.role !== "admin" && (
+                  <Link href="/cart" className="w-full" onClick={() => setIsOpen(false)}>
+                    <div className={`flex items-center py-3 px-4 rounded-md text-base font-medium transition-all duration-200 ease-in-out ${pathname === "/cart" ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md" : ""}`}>
+                      <ShoppingCart className="mr-3 h-5 w-5" />
+                      <span>Sepetim</span>
+                      {items.length > 0 && (
+                        <Badge className="ml-2 px-2">{items.length}</Badge>
+                      )}
+                    </div>
+                  </Link>
+                )}
 
                 <button
                   onClick={handleLogout}

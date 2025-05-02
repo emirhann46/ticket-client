@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Clock } from "lucide-react";
+import { Calendar, MapPin, Clock, ShoppingCart, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
+import useCartStore from "@/app/hooks/useCart";
+import useAuthStore from "@/app/hooks/useAuth";
+import { useRouter } from "next/navigation";
 
 // MongoDB Event tipini tanımlıyoruz
 interface Event {
@@ -28,6 +31,9 @@ export function EventList() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const searchParams = useSearchParams();
+  const { addItem, isInCart } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
+  const router = useRouter();
 
   // URL'den filtre parametrelerini al
   const categoryId = searchParams.get('category');
@@ -120,6 +126,45 @@ export function EventList() {
     );
   }
 
+  // Event'i sepete ekle
+  const handleAddToCart = (event: Event, e: React.MouseEvent) => {
+    e.preventDefault(); // Link'in çalışmasını engelle
+    
+    if (!isAuthenticated) {
+      toast.error("Bilet alabilmek için giriş yapmalısınız");
+      router.push("/auth/login");
+      return;
+    }
+
+    // her etkinlikten yalnızca 1 bilet alınabilir kısıtlaması için
+    if (isInCart(event._id)) {
+      toast.error("Bu etkinlik zaten sepetinizde bulunuyor");
+      return;
+    }
+
+    const cartItem = {
+      id: event._id,
+      eventId: event._id,
+      eventTitle: event.title,
+      eventImage: event.image || defaultImageUrl,
+      eventDate: formatDate(event.date),
+      eventTime: "20:00", // Eğer API'den saat bilgisi gelmiyorsa varsayılan değer
+      eventLocation: event.location,
+      ticketType: "Standart", // gerçek uygulamada bilet tipi seçimi eklenebilir
+      price: event.price,
+      quantity: 1,
+    };
+
+    addItem(cartItem);
+    toast.success("Etkinlik sepete eklendi");
+  };
+
+  // Sepete yönlendirme
+  const navigateToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push("/cart");
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,42 +173,64 @@ export function EventList() {
             key={event._id}
             className="flex flex-col rounded-lg overflow-hidden border border-border bg-card transition-all duration-200 hover:border-primary hover:shadow-md"
           >
-            <div className="relative h-48 bg-muted">
-              <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{
-                  backgroundImage: `url(${event.image || defaultImageUrl})`
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-4">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground">
-                  {event.category?.name || "Genel"}
-                </span>
+            <Link href={`/events/${event._id}`} className="block">
+              <div className="relative h-48 bg-muted">
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    backgroundImage: `url(${event.image || defaultImageUrl})`
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-0 left-0 p-4">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground">
+                    {event.category?.name || "Genel"}
+                  </span>
+                </div>
               </div>
-            </div>
+            </Link>
             <div className="flex-1 p-6 flex flex-col">
-              <h3 className="text-lg font-medium text-foreground">{event.title}</h3>
-              <div className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                {event.description}
-              </div>
-              <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {formatDate(event.date)}
+              <Link href={`/events/${event._id}`} className="block">
+                <h3 className="text-lg font-medium text-foreground">{event.title}</h3>
+                <div className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                  {event.description}
                 </div>
-                <div className="flex items-center">
-                  <MapPin className="mr-2 h-4 w-4" />
-                  {event.location}
+                <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-center">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {formatDate(event.date)}
+                  </div>
+                  <div className="flex items-center">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    {event.location}
+                  </div>
                 </div>
-              </div>
+              </Link>
               <div className="mt-6 flex items-center justify-between">
                 <div className="text-lg font-semibold text-foreground">
                   {event.price} ₺
                 </div>
-                <Link href={`/events/${event._id}`}>
-                  <Button size="sm">Bilet Al</Button>
-                </Link>
+                {isInCart(event._id) ? (
+                  <div className="flex space-x-2">
+                    <Button 
+                      size="sm" 
+                      variant="secondary" 
+                      onClick={(e) => navigateToCart(e)}
+                      className="px-2"
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Sepette
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    onClick={(e) => handleAddToCart(event, e)}
+                  >
+                    <ShoppingCart className="mr-1 h-4 w-4" />
+                    Sepete Ekle
+                  </Button>
+                )}
               </div>
             </div>
           </div>
