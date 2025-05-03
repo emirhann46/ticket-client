@@ -137,6 +137,7 @@ export default function TicketsPage() {
     fetchUserTickets()
    
   }, []);
+  
 
   // Kullanıcı rolünü al
   const userRole = user?.role;
