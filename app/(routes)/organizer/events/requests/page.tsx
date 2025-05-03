@@ -35,8 +35,8 @@ interface EventRequest {
   };
   userId: string;
   status: "pending" | "approved" | "rejected";
-  ticketPrice: number;
-  totalTickets: number;
+  price: number;
+  availableTickets: number;
   adminComment?: string;
   createdAt: string;
   updatedAt: string;
@@ -153,10 +153,10 @@ export default function EventRequestsPage() {
                     <span className="font-medium">Kategori:</span> {request.category?.name || "Belirtilmemiş"}
                   </div>
                   <div>
-                    <span className="font-medium">Bilet Fiyatı:</span> {request.ticketPrice} ₺
+                    <span className="font-medium">Bilet Fiyatı:</span> {request.price} ₺
                   </div>
                   <div>
-                    <span className="font-medium">Toplam Bilet:</span> {request.totalTickets}
+                    <span className="font-medium">Toplam Bilet:</span> {request.availableTickets}
                   </div>
                 </div>
                 {request.adminComment && (

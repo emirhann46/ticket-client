@@ -15,11 +15,14 @@ import {
 } from "@/lib/firebase";
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
-// Hata gösterme durumunu kontrol eden değişken
-let isErrorShown = false;
-
 // Auth hata mesajları için tost ID'si
 const AUTH_TOAST_ID = "auth-error";
+
+// Oturum durumu kontrolü için kullanılacak bayraklar
+let isRefreshing = false;
+let isErrorShown = false;
+let lastRefreshTime = 0;
+const REFRESH_COOLDOWN = 5000; // 5 saniye içinde tekrar kontrol etme
 
 interface AuthState {
   jwt: string;
@@ -110,6 +113,17 @@ const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
 
         try {
+          // Sepet içeriğini geçici olarak sakla (çıkış öncesi)
+          // Circular dependency'yi önlemek için dinamik import kullanıyoruz
+          if (typeof window !== 'undefined') {
+            try {
+              const cartModule = await import('./useCart');
+              cartModule.default.getState().preserveCartOnLogout();
+            } catch (cartError) {
+              console.error("Sepet saklama hatası:", cartError);
+            }
+          }
+
           // Firebase'den çıkış yap
           await logoutUser();
 

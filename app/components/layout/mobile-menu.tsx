@@ -5,7 +5,7 @@ import { ThemeSwitcher } from "@/app/components/theme/theme-switcher";
 interface MobileMenuProps {
   isOpen: boolean;
   navLinks: { href: string; label: string; icon: React.ElementType }[];
-  activeLinks: { href: string; label: string; icon: React.ElementType }[];
+  activeLinks: { href: string; label: string; icon: React.ElementType; count?: number }[];
   isAuthenticated: boolean;
   user: any;
   pathname: string;
@@ -40,8 +40,8 @@ export default function MobileMenu({
                   key={link.href}
                   href={link.href}
                   className={`block py-3 px-4 rounded-md text-base font-medium transition-all duration-200 ease-in-out ${pathname === link.href
-                      ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
-                      : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
+                    ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
+                    : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
                     }`}
                 >
                   {link.label}
@@ -75,11 +75,18 @@ export default function MobileMenu({
                     key={link.href}
                     href={link.href}
                     className={`flex items-center py-3 px-4 rounded-md text-base font-medium transition-all duration-200 ease-in-out ${pathname === link.href
-                        ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
-                        : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
+                      ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-md"
+                      : "text-foreground hover:bg-gradient-to-r hover:from-accent/50 hover:to-accent/30 hover:shadow-sm"
                       }`}
                   >
-                    <link.icon className="mr-3 h-5 w-5" />
+                    <div className="relative mr-3">
+                      <link.icon className="h-5 w-5" />
+                      {link.count && link.count > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-primary text-white rounded-full text-xs w-5 h-5 flex items-center justify-center">
+                          {link.count}
+                        </span>
+                      )}
+                    </div>
                     {link.label}
                   </Link>
                 ))}

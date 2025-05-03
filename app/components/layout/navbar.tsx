@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { UserCircle, ShoppingCart, Ticket, Gift, LogOut, User, Inbox, CalendarDays, Users, Building, PlusCircle, RefreshCw, Menu, X, Home } from "lucide-react";
 import { useEffect, useState } from "react";
 import useAuthStore from "@/app/hooks/useAuth";
+import useCart from "@/app/hooks/useCart";
 import { toast } from "react-hot-toast";
 import MobileMenu from "./mobile-menu";
 
@@ -15,13 +16,41 @@ export function Navbar() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isAuthenticated, user, logout, refreshUserData } = useAuthStore();
+  const { getItemsCount, clearCart } = useCart();
   const [isClient, setIsClient] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
 
-  // SSR/CSR uyumsuzluğunu önle
+  // SSR/CSR uyumsuzluğunu önle ve sepet sayısını güncelle
   useEffect(() => {
     setIsClient(true);
+    if (typeof window !== 'undefined') {
+      // Sayfa yüklendiğinde sepet sayacını güncelle
+      setCartItemCount(getItemsCount());
+    }
   }, []);
+
+  // Sepet sayısını güncellemek için useEffect
+  useEffect(() => {
+    if (isClient) {
+      // Sayfayı yeniledikten sonra sepet sayacını güncelle
+      setCartItemCount(getItemsCount());
+
+      // Sepet değişikliklerini dinleyen bir event listener ekliyoruz
+      const updateCartCount = () => {
+        setCartItemCount(getItemsCount());
+      };
+
+      window.addEventListener('storage', updateCartCount);
+      document.addEventListener('cartUpdated', updateCartCount);
+
+      // Component unmount olduğunda event listener'ları temizliyoruz
+      return () => {
+        window.removeEventListener('storage', updateCartCount);
+        document.removeEventListener('cartUpdated', updateCartCount);
+      };
+    }
+  }, [isClient, getItemsCount]);
 
   // İlk yüklenmede ve rota değiştiğinde kullanıcı bilgilerini yenile
   useEffect(() => {
@@ -35,18 +64,23 @@ export function Navbar() {
 
   // Kullanıcı rolünü doğru şekilde al
   const userRole = user?.role || "user";
+  type NavLink = {
+    href: string;
+    label: string;
+    icon: React.ElementType;
+    count?: number; // opsiyonel hale getiriyoruz
+  };
 
   // Ana menü linkleri
-  const navLinks = [
+  const navLinks: NavLink[] = [
     { href: "/", label: "Ana Sayfa", icon: Home },
     { href: "/events", label: "Etkinlikler", icon: CalendarDays },
   ];
 
-  // Rol bazlı linkler
-  const getRoleBasedLinks = () => {
+  const getRoleBasedLinks = (): NavLink[] => {
     if (!user) return [];
 
-    const links = [
+    const links: NavLink[] = [
       { href: "/profile", label: "Profil", icon: User },
     ];
 
@@ -55,14 +89,19 @@ export function Navbar() {
     }
 
     if (userRole === "organizer") {
-      links.push({ href: "/organizer", label: "Organizatör Panel", icon: Building });
+      links.push(
+        { href: "/organizer", label: "Organizatör Panel", icon: Building },
+        { href: "/tickets", label: "Biletlerim", icon: Ticket },
+        { href: "/cart", label: "Sepet", icon: ShoppingCart, count: cartItemCount }
+      );
     }
 
-    if (!["admin", "organizer"].includes(userRole)) {
-      links.push({ href: "/organizer-application", label: "Organizatör Ol", icon: PlusCircle });
+    if (userRole === "user") {
       links.push(
+        { href: "/organizer-application", label: "Organizatör Ol", icon: PlusCircle },
         { href: "/tickets", label: "Biletlerim", icon: Ticket },
-        { href: "/cart", label: "Sepet", icon: ShoppingCart },);
+        { href: "/cart", label: "Sepet", icon: ShoppingCart, count: cartItemCount }
+      );
     }
 
     return links;
@@ -72,6 +111,8 @@ export function Navbar() {
 
   const handleLogout = () => {
     logout();
+    // Kullanıcı çıkış yaptığında sepeti temizle
+    clearCart();
     toast.success("Başarıyla çıkış yapıldı");
     setMobileMenuOpen(false);
     router.push("/");
@@ -161,11 +202,18 @@ export function Navbar() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`flex w-18 flex-col p-4 cursor-pointer ${pathname === link.href ? "bg-accent" : ""
+                      className={`flex w-18 flex-col p-4 mx-2 cursor-pointer ${pathname === link.href ? "bg-accent" : ""
                         }`}
                     >
-                      <link.icon className="h-5 w-5" />
-                      <span className="text-xs mt-1 mb-1">{link.label}</span>
+                      <div className="relative">
+                        <link.icon className="h-5 w-5" />
+                        {link.count && link.count >= 0 && (
+                          <span className="absolute top-[2px] text-black left-5 bg-primary  rounded-full text-xs w-5 h-5 flex items-center justify-center">
+                            {link.count}
+                          </span>
+                        )}
+                      </div>
+                      <span className="">{link.label}</span>
                     </Button>
                   </Link>
                 ))}

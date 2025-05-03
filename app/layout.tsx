@@ -19,7 +19,7 @@ export default function RootLayout({
   const router = useRouter();
 
   // Korumalı sayfalar listesi
-  const protectedRoutes = ['/profile', '/admin', '/tickets', '/cart', '/organizer'];
+  const protectedRoutes = ['/profile', '/admin', '/organizer'];
 
   // Auth kontrolü ve token doğrulama
   useEffect(() => {

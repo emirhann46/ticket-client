@@ -3,49 +3,55 @@ export type User = {
   username: string;
   email: string;
   role: "user" | "organizer" | "admin";
-  provider?: string;
-  blocked?: boolean;
-  confirmed?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  // publishedAt ve documentId genellikle MongoDB'de kullanılmaz, kaldırıldı
   firstName?: string;
   lastName?: string;
   avatar?: string;
+  profileImage?: string;
+  firebaseUid?: string;
+  isFirebaseUser?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   tickets?: Ticket[];
-  organizer?: Organizer;
-  description?: string;
 };
 
 export type Organizer = {
-  id: string; // MongoDB ObjectId string
+  _id: string; // MongoDB ObjectId string
   companyName: string;
   taxNumber: string;
   description: string;
   logo?: string; // Sadece url string
   approved: boolean;
-  user: User;
+  userId: string | User;
   events?: Event[];
 };
 
 export type Event = {
-  id: string; // MongoDB ObjectId string
+  _id: string; // MongoDB ObjectId string
   title: string;
   description: string;
   date: string;
   location: string;
   price: number;
   availableTickets: number;
-  image?: string;
-  category: Category;
-  organizerId: User;
+  coverImage?: string; // Ana resim
+  sliderImages?: string[]; // Slider resimleri (array)
+  image?: string; // Legacy support için
+  category: {
+    _id: string;
+    name: string;
+  };
+  organizerId: {
+    _id: string;
+    username: string;
+    email: string;
+  };
   isApproved: boolean;
   createdAt?: string;
   tickets?: Ticket[];
 };
 
 export type Category = {
-  id: string; // MongoDB ObjectId string
+  _id: string; // MongoDB ObjectId string
   name: string;
   description?: string;
   image?: string;
@@ -53,9 +59,9 @@ export type Category = {
 };
 
 export type Ticket = {
-  id: string; // MongoDB ObjectId string
-  userId: User;
-  eventId: Event;
+  _id: string; // MongoDB ObjectId string
+  userId: string | User;
+  eventId: string | Event;
   purchaseDate: string;
   price: number;
   isPaid: boolean;
@@ -65,12 +71,35 @@ export type Ticket = {
 };
 
 export type Payment = {
-  id: string; // MongoDB ObjectId string
+  _id: string; // MongoDB ObjectId string
   paymentCode: string;
   amount: number;
   paymentMethod: "credit_card" | "paypal" | "bank_transfer";
   status: "pending" | "completed" | "failed";
   transactionId: string;
-  user: User;
-  tickets: Ticket[];
+  userId: string | User;
+  tickets: string[] | Ticket[];
+  createdAt?: string;
+};
+
+// Sepet işlemleri için gerekli tipler
+export type CartItem = {
+  eventId: string;
+  event: Event;
+  quantity: number;
+};
+
+// Ödeme işlemleri için gerekli tipler
+export type PaymentForm = {
+  cardNumber: string;
+  cardHolderName: string;
+  expiryDate: string;
+  cvc: string;
+  amount: number;
+};
+
+export type CheckoutSession = {
+  id: string;
+  url: string;
+  status: string;
 };

@@ -1,14 +1,27 @@
 "use client";
 
+import { use } from "react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Share2, Heart, Users } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Share2,
+  Heart,
+  Users,
+  Check,
+  ShoppingCart,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import useAuthStore from "@/app/hooks/useAuth";
+import useCart from "@/app/hooks/useCart";
 import { useRouter } from "next/navigation";
+import { Event } from "@/app/constans/type";
 
 interface EventPageProps {
   params: {
@@ -16,40 +29,32 @@ interface EventPageProps {
   };
 }
 
-interface Event {
-  _id: string;
-  title: string;
-  description: string;
-  location: string;
-  date: string;
-  price: number;
-  image: string;
-  category: {
-    _id: string;
-    name: string;
-  };
-  organizerId: {
-    _id: string;
-    username: string;
-    email: string;
-  };
-  availableTickets: number;
-}
-
-export default function EventPage({ params }: EventPageProps) {
-  const eventId = params.id;
+export default function EventPage({
+  params,
+}: {
+  params: Promise<EventPageProps["params"]>;
+}) {
+  const { id: eventId } = use(params);
   const [isLiked, setIsLiked] = useState(false);
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [similarEvents, setSimilarEvents] = useState([]);
-  const { isAuthenticated, getJwt } = useAuthStore();
+  const [similarEvents, setSimilarEvents] = useState<Event[]>([]);
+  const { isAuthenticated } = useAuthStore();
+  const { addToCart, isInCart } = useCart();
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     const fetchEventDetails = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/events/${eventId}`);
-
+        const response = await axios.get(
+          `http://localhost:5000/api/events/${eventId}`
+        );
         if (response.data && response.data.data) {
           setEvent(response.data.data);
         }
@@ -63,11 +68,15 @@ export default function EventPage({ params }: EventPageProps) {
 
     const fetchSimilarEvents = async () => {
       try {
-        // Benzer etkinlikleri getir (aynı kategorideki diğer etkinlikler olabilir)
-        const response = await axios.get(`http://localhost:5000/api/events?limit=3`);
-
+        const response = await axios.get(
+          `http://localhost:5000/api/events?limit=3`
+        );
         if (response.data && response.data.data) {
-          setSimilarEvents(response.data.data.filter((e: any) => e._id !== eventId).slice(0, 3));
+          setSimilarEvents(
+            response.data.data
+              .filter((e: any) => e._id !== eventId)
+              .slice(0, 3)
+          );
         }
       } catch (error) {
         console.error("Benzer etkinlikler yüklenirken hata:", error);
@@ -80,51 +89,38 @@ export default function EventPage({ params }: EventPageProps) {
 
   const handleLike = () => {
     setIsLiked(!isLiked);
-    // Bu işlevsellik sonraki aşamalarda implement edilebilir
-    toast.success(isLiked ? "Etkinlik favorilerden çıkarıldı" : "Etkinlik favorilere eklendi");
+    toast.success(
+      isLiked ? "Etkinlik favorilerden çıkarıldı" : "Etkinlik favorilere eklendi"
+    );
   };
 
   const handleShare = () => {
-    // Paylaşım fonksiyonu
     if (navigator.share) {
-      navigator.share({
-        title: event?.title || 'Etkinlik',
-        text: event?.description || '',
-        url: window.location.href,
-      })
-        .catch(err => console.error('Paylaşım hatası:', err));
+      navigator
+        .share({
+          title: event?.title || "Etkinlik",
+          text: event?.description || "",
+          url: window.location.href,
+        })
+        .catch((err) => console.error("Paylaşım hatası:", err));
     } else {
       toast.success("Etkinlik bağlantısı panoya kopyalandı!");
       navigator.clipboard.writeText(window.location.href);
     }
   };
 
-  const handleBuyTicket = async (price: number) => {
-    if (!isAuthenticated) {
-      toast.error("Bilet almak için giriş yapmalısınız");
-      router.push('/auth/login');
-      return;
-    }
-
-    try {
-      const token = getJwt();
-
-      await axios.post('http://localhost:5000/api/tickets',
-        { eventId: eventId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success("Bilet sepete eklendi!");
-      router.push('/cart');
-    } catch (error: any) {
-      console.error("Bilet eklenirken hata:", error);
-      toast.error(error.response?.data?.message || "Bilet eklenemedi");
-    }
+  const handleAddToCart = () => {
+    if (!event) return;
+    addToCart(event);
+    toast.success(`${event.title} sepete eklendi!`);
+    setTimeout(() => {
+      setIsClient(false);
+      setIsClient(true);
+    }, 100);
   };
 
-  // Tarih formatlayıcı fonksiyon
   const formatDate = (dateString: string) => {
-    if (!dateString) return '';
+    if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("tr-TR", {
       day: "numeric",
@@ -133,8 +129,37 @@ export default function EventPage({ params }: EventPageProps) {
     });
   };
 
-  // Sabit bir varsayılan resim URL'i
-  const defaultImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80";
+  const getEventImage = (event: Event | null) => {
+    if (!event) return "";
+    if (event.coverImage) return event.coverImage;
+    if (event.image) return event.image;
+    return "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80";
+  };
+
+  const getEventSliderImages = (event: Event | null) => {
+    if (!event) return [];
+    const images: string[] = [];
+    const mainImage = getEventImage(event);
+    if (mainImage) images.push(mainImage);
+    if (event.sliderImages && event.sliderImages.length > 0) {
+      event.sliderImages.forEach((img) => {
+        if (!images.includes(img)) images.push(img);
+      });
+    }
+    return images;
+  };
+
+  const nextSlide = () => {
+    const slides = getEventSliderImages(event);
+    setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+  };
+
+  const prevSlide = () => {
+    const slides = getEventSliderImages(event);
+    setCurrentSlideIndex(
+      (prev) => (prev - 1 + slides.length) % slides.length
+    );
+  };
 
   if (loading) {
     return (
@@ -148,10 +173,6 @@ export default function EventPage({ params }: EventPageProps) {
               <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
               <div className="h-6 bg-muted rounded w-1/2 mb-3"></div>
               <div className="h-6 bg-muted rounded w-2/3 mb-3"></div>
-              <div className="h-6 bg-muted rounded w-3/4 mb-3"></div>
-              <div className="mt-auto">
-                <div className="h-10 bg-muted rounded w-full"></div>
-              </div>
             </div>
           </div>
         </div>
@@ -160,162 +181,98 @@ export default function EventPage({ params }: EventPageProps) {
   }
 
   if (!event) {
-    return (
-      <div className="bg-background min-h-screen py-12">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-2xl font-bold mb-4">Etkinlik bulunamadı</h1>
-          <p className="mb-6">Bu etkinlik artık mevcut değil veya kaldırılmış olabilir.</p>
-          <Button asChild><Link href="/events">Tüm Etkinlikler</Link></Button>
-        </div>
-      </div>
-    );
+    return <div>Etkinlik bulunamadı.</div>;
   }
+
+  const sliderImages = getEventSliderImages(event);
 
   return (
     <div className="bg-background min-h-screen py-12">
       <div className="container mx-auto px-4">
-        {/* Etkinlik Başlık ve Resim */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Sol taraf - Görseller */}
           <div className="lg:col-span-2">
             <div className="relative w-full h-[400px] rounded-lg overflow-hidden">
-              <Image
-                src={event.image || defaultImageUrl}
-                alt={event.title}
-                fill
-                className="object-cover"
-              />
+              {sliderImages.length > 0 && (
+                <Image
+                  src={sliderImages[currentSlideIndex]}
+                  alt={event.title}
+                  layout="fill"
+                  objectFit="cover"
+                  className="rounded-lg"
+                />
+              )}
+              {/* Slider butonları */}
+              <button
+                onClick={prevSlide}
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white/70 p-2 rounded-full"
+              >
+                <ChevronLeft />
+              </button>
+              <button
+                onClick={nextSlide}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/70 p-2 rounded-full"
+              >
+                <ChevronRight />
+              </button>
             </div>
           </div>
-          <div className="bg-card p-6 rounded-lg border border-border shadow-sm flex flex-col">
-            <h1 className="text-2xl font-bold mb-4 text-foreground">{event.title}</h1>
 
-            <div className="flex items-center mb-3 text-muted-foreground">
-              <Calendar className="h-5 w-5 mr-2" />
+          {/* Sağ taraf - Etkinlik Detayları */}
+          <div className="bg-card p-6 rounded-lg border border-border shadow-sm flex flex-col gap-4">
+            <h1 className="text-2xl font-bold">{event.title}</h1>
+            <p className="text-muted-foreground">{event.description}</p>
+            <div className="flex items-center gap-2">
+              <Calendar size={18} />
               <span>{formatDate(event.date)}</span>
             </div>
-
-            <div className="flex items-center mb-3 text-muted-foreground">
-              <MapPin className="h-5 w-5 mr-2" />
+            <div className="flex items-center gap-2">
+              <MapPin size={18} />
               <span>{event.location}</span>
             </div>
 
-            <div className="flex items-center mb-3 text-muted-foreground">
-              <Users className="h-5 w-5 mr-2" />
-              <span>Organizatör: {event.organizerId?.username || "Bilinmiyor"}</span>
-            </div>
-
-            <div className="mt-2 mb-6">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                {event.category?.name || "Genel"}
-              </span>
-            </div>
-
-            <div className="mt-auto">
-              <div className="flex justify-between items-center mb-4">
-                <div className="text-foreground">
-                  <span className="text-sm">Bilet Fiyatı</span>
-                  <p className="text-xl font-bold">{event.price}₺</p>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleLike}
-                    className={isLiked ? "text-red-500" : ""}
-                  >
-                    <Heart className="h-5 w-5" fill={isLiked ? "currentColor" : "none"} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleShare}
-                  >
-                    <Share2 className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-              <Button
-                className="w-full"
-                onClick={() => handleBuyTicket(event.price)}
-                disabled={event.availableTickets <= 0}
-              >
-                {event.availableTickets > 0 ? "Bilet Al" : "Biletler Tükendi"}
+            <div className="flex flex-col gap-2 mt-4">
+              <Button onClick={handleAddToCart}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Sepete Ekle
+              </Button>
+              <Button variant="outline" onClick={handleLike}>
+                <Heart className="mr-2 h-4 w-4" />
+                {isLiked ? "Favorilerden Çıkar" : "Favorilere Ekle"}
+              </Button>
+              <Button variant="ghost" onClick={handleShare}>
+                <Share2 className="mr-2 h-4 w-4" />
+                Paylaş
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Etkinlik Detayları ve Bilet Seçenekleri */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          <div className="lg:col-span-2">
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm mb-8">
-              <h2 className="text-xl font-bold mb-4 text-foreground">Etkinlik Detayları</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{event.description}</p>
-            </div>
-
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
-              <h2 className="text-xl font-bold mb-4 text-foreground">Konum</h2>
-              <div className="relative w-full h-[300px] rounded-lg overflow-hidden bg-muted">
-                {/* Burada gerçek bir harita komponenti olacak */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-muted-foreground">Harita yükleniyor...</p>
-                </div>
-              </div>
-              <p className="mt-4 text-muted-foreground">{event.location}</p>
-            </div>
-          </div>
-
-          <div>
-            <div className="bg-card p-6 rounded-lg border border-border shadow-sm sticky top-24">
-              <h2 className="text-xl font-bold mb-4 text-foreground">Bilet Bilgisi</h2>
-              <div className="p-4 border border-border rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium text-foreground">Standart Bilet</h3>
-                  <span className="font-bold text-foreground">{event.price}₺</span>
-                </div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm text-muted-foreground">
-                    {event.availableTickets} adet kaldı
-                  </span>
-                </div>
+        {/* Benzer Etkinlikler */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Benzer Etkinlikler</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {similarEvents.map((e) => (
+              <div key={e._id} className="border rounded-lg p-4">
+                <Image
+                  src={getEventImage(e)}
+                  alt={e.title}
+                  width={400}
+                  height={200}
+                  className="rounded-lg mb-2 object-cover w-full h-40"
+                />
+                <h3 className="font-bold">{e.title}</h3>
+                <p className="text-sm text-muted-foreground line-clamp-2">{e.description}</p>
                 <Button
-                  className="w-full"
-                  onClick={() => handleBuyTicket(event.price)}
-                  disabled={event.availableTickets <= 0}
+                  className="mt-2"
+                  onClick={() => router.push(`/events/${e._id}`)}
                 >
-                  {event.availableTickets > 0 ? "Sepete Ekle" : "Biletler Tükendi"}
+                  Detayları Gör
                 </Button>
               </div>
-            </div>
+            ))}
           </div>
         </div>
-
-        {/* Benzer Etkinlikler */}
-        {similarEvents.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6 text-foreground">Benzer Etkinlikler</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {similarEvents.map((relatedEvent: any) => (
-                <Link href={`/events/${relatedEvent._id}`} key={relatedEvent._id}>
-                  <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div className="relative w-full h-48">
-                      <Image
-                        src={relatedEvent.image || defaultImageUrl}
-                        alt={relatedEvent.title}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-foreground">{relatedEvent.title}</h3>
-                      <p className="text-sm text-muted-foreground">{formatDate(relatedEvent.date)}</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
