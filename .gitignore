@@ -39,3 +39,34 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Node.js dependencies
+node_modules/
+
+# Build outputs
+.next/
+
+# Environment variables
+.env
+
+# Firebase configuration
+lib/firebase.ts
+
+# Logs
+*.log
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Public sensitive files
+public/*.svg
+public/*.ico
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE specific files
+.vscode/
+.idea/
